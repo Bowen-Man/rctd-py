@@ -175,3 +175,50 @@ class TestReference:
         ref_sparse = Reference(adata_sparse, cell_type_col="cell_type", n_max_cells=n_max_cells)
 
         np.testing.assert_allclose(ref_sparse.profiles, ref_dense.profiles, rtol=1e-12)
+
+
+def test_cell_type_order_follows_r():
+    """Type indices must match spacexr's levels(cell_types): R's sort for plain strings, the
+    category order for a categorical (an R factor's levels). Expected orders are R 4.5's sort()."""
+    import anndata
+    import pandas as pd
+
+    from rctd._reference import r_sort_key
+
+    assert "".join(sorted("$+-_,.09aAbB", key=r_sort_key)) == "_-,.+$09aAbB"
+    r_order = [
+        "adipocyte",
+        "B cell",
+        "blood vessel endothelial cell",
+        "CD4-positive helper T cell",
+        "CD4-positive, alpha-beta T cell",
+        "gamma_delta_T_cells",
+        "Germinal_center_B_cells",
+        "Serpinf1",
+        "SMC",
+    ]
+    assert sorted(r_order[::-1], key=r_sort_key) == r_order
+
+    rng = np.random.default_rng(0)
+    types = ["Serpinf1", "SMC", "adipocyte", "B cell"]
+    X = rng.poisson(5, size=(400, 50)).astype(np.float32)
+    labels = np.repeat(types, 100)
+    ad = anndata.AnnData(
+        X=X, obs=pd.DataFrame({"cell_type": labels}, index=[f"c{i}" for i in range(400)])
+    )
+    ad.var_names = [f"g{i}" for i in range(50)]
+    assert Reference(ad, cell_min=25, min_UMI=1).cell_type_names == [
+        "adipocyte",
+        "B cell",
+        "Serpinf1",
+        "SMC",
+    ]
+    ad.obs["cell_type"] = pd.Categorical(
+        labels, categories=["SMC", "B cell", "Serpinf1", "adipocyte"]
+    )
+    assert Reference(ad, cell_min=25, min_UMI=1).cell_type_names == [
+        "SMC",
+        "B cell",
+        "Serpinf1",
+        "adipocyte",
+    ]

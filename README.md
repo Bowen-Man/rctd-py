@@ -439,7 +439,7 @@ All defaults match R spacexr, so default R results reproduce with default rctd-p
 | `counts_MIN` | `counts_MIN` | `10` | Min total counts for a gene |
 | `UMI_min_sigma` | `UMI_min_sigma` | `300` | Min UMI for sigma estimation pixels |
 | `N_epoch` | `N_epoch` | `8` | Epochs for platform effect estimation |
-| `N_fit` | `N_fit` | `100` | Pixels sampled for sigma fitting |
+| `N_fit` | `N_fit` | `1000` | Pixels sampled for sigma fitting |
 | `MIN_CHANGE_BULK` | `MIN_CHANGE_BULK` | `0.0001` | Convergence threshold (bulk fitting) |
 | `MIN_CHANGE_REG` | `MIN_CHANGE_REG` | `0.001` | Convergence threshold (per-pixel) |
 | `MIN_OBS` | `MIN_OBS` | `3` | Min observations for DE gene selection |
@@ -497,7 +497,7 @@ Stateful class for step-by-step control. Call `fit_platform_effects()`, then `ru
 |-----------|---------|-------------|
 | `UMI_min` | 100 | Minimum UMI count per pixel |
 | `UMI_min_sigma` | 300 | Minimum UMI for sigma estimation |
-| `N_fit` | 100 | # pixels sampled for sigma fitting |
+| `N_fit` | 1000 | # pixels sampled for sigma fitting |
 | `MAX_MULTI_TYPES` | 4 | Max cell types in multi mode |
 | `CONFIDENCE_THRESHOLD` | 5.0 | Singlet confidence threshold |
 | `DOUBLET_THRESHOLD` | 20.0 | Doublet certainty threshold |

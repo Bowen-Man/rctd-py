@@ -3,11 +3,30 @@
 Ports get_cell_type_info, get_norm_ref, get_de_genes from R spacexr.
 """
 
+import unicodedata
 from collections import Counter
 
 import anndata
 import numpy as np
+import pandas as pd
 from scipy import sparse
+
+# R's default collation on Linux/macOS builds is ICU (CLDR root): spaces and punctuation, then
+# symbols, then digits, then letters case-insensitively, ties lowercase first. Order measured from
+# R's sort() of the printable ASCII characters.
+_R_ORDER = " _-,;:!?.'\"()[]{}@*/\\&#%`^+<=>|~$0123456789abcdefghijklmnopqrstuvwxyz"
+_R_RANK = {c: i for i, c in enumerate(_R_ORDER)}
+
+
+def r_sort_key(name: str):
+    """Sort key giving R's factor-level order, so cell-type indices match spacexr's.
+
+    spacexr falls back to "the first type" by index (doublet mode, one candidate), so the
+    order changes results, not only the column order.
+    """
+    base = "".join(c for c in unicodedata.normalize("NFD", name) if not unicodedata.combining(c))
+    primary = tuple(_R_RANK.get(c.lower(), len(_R_RANK) + ord(c.lower())) for c in base)
+    return primary, tuple(c.isupper() for c in base), name
 
 
 class Reference:
@@ -28,7 +47,14 @@ class Reference:
             raise ValueError(f"Column '{cell_type_col}' not found in adata.obs")
 
         cell_types = np.asarray(adata.obs[cell_type_col].values)
-        unique_types = sorted(set(cell_types))
+        # Type order follows spacexr, which uses levels(cell_types): a categorical keeps its
+        # category order (an R factor's levels), anything else is sorted as R's factor() would.
+        col = adata.obs[cell_type_col]
+        if isinstance(col.dtype, pd.CategoricalDtype):
+            present = set(cell_types)
+            unique_types = [c for c in col.cat.categories if c in present]
+        else:
+            unique_types = sorted(set(cell_types), key=r_sort_key)
 
         # Check minimum cell counts
         type_counts = Counter(cell_types)

@@ -448,6 +448,69 @@ except Exception:
     _solve_box_qp_batch_compiled = None
 
 
+# Optimality tolerance; D is normalised to unit 2-norm before every solve.
+_QP_KKT_TOL = 1e-10
+
+
+def _finish_box_qp(
+    D: torch.Tensor, d: torch.Tensor, lower_bound: torch.Tensor, x: torch.Tensor
+) -> torch.Tensor:
+    """Make the Gauss-Seidel result exact, as R's quadprog::solve.QP is.
+
+    Fifty sweeps stop short on ill-conditioned pixels at high K, which can flip a candidate
+    type. Problems failing the KKT check get an active-set (Lawson-Hanson, Gram form) solve
+    warm-started from the sweep result: usually one or two masked K x K solves.
+    """
+    g = torch.bmm(D, x.unsqueeze(2)).squeeze(2) - d
+    viol = torch.where(x > lower_bound, g.abs(), torch.clamp(-g, min=0.0)).amax(1)
+    idx = torch.nonzero(viol > _QP_KKT_TOL).squeeze(1)
+    if idx.numel() == 0:
+        return x
+    x = x.clone()
+    x[idx] = _active_set_box_qp(D[idx], d[idx], lower_bound[idx], x[idx])
+    return x
+
+
+def _active_set_box_qp(
+    D: torch.Tensor, d: torch.Tensor, lb: torch.Tensor, x0: torch.Tensor
+) -> torch.Tensor:
+    """min 0.5 x'Dx - d'x  s.t. x >= lb, batched; exact up to the linear solves."""
+    n, K = d.shape
+    c = d - torch.bmm(D, lb.unsqueeze(2)).squeeze(2)  # y = x - lb >= 0
+    y = torch.clamp(x0 - lb, min=0.0)
+    free = y > 0
+    done = torch.zeros(n, dtype=torch.bool, device=D.device)
+    for _ in range(
+        3 * K + 10
+    ):  # ponytail: iteration cap; Lawson-Hanson ends far sooner in practice
+        m = free.to(D.dtype)
+        M = D * (m.unsqueeze(2) * m.unsqueeze(1)) + torch.diag_embed(1.0 - m)
+        s = torch.linalg.solve(M, (c * m).unsqueeze(2)).squeeze(2)
+        bad = free & (s <= 0)
+        back = bad.any(1) & ~done
+        # infeasible solve: step from y towards s until the first free variable hits zero
+        ratio = torch.where(
+            bad, y / torch.clamp(y - s, min=1e-300), torch.full_like(y, float("inf"))
+        )
+        alpha = torch.clamp(ratio.amin(1), max=1.0).unsqueeze(1)
+        y_back = y + alpha * (s - y)
+        fwd = ~back & ~done
+        y = torch.where(back.unsqueeze(1), y_back, torch.where(fwd.unsqueeze(1), s, y))
+        free = torch.where(back.unsqueeze(1), free & (y > 1e-14), free)
+        y = torch.where(free, y, torch.zeros_like(y))
+        # feasible solve: add the most violating bound variable, or stop
+        w = c - torch.bmm(D, y.unsqueeze(2)).squeeze(2)
+        cand = ~free & (w > _QP_KKT_TOL)
+        optimal = fwd & ~cand.any(1)
+        done = done | optimal
+        add = fwd & ~optimal
+        if not bool(add.any()) and not bool(back.any()):
+            break
+        j = torch.where(cand, w, torch.full_like(w, -float("inf"))).argmax(1)
+        free = free | (add.unsqueeze(1) & (torch.arange(K, device=D.device) == j.unsqueeze(1)))
+    return y + lb
+
+
 @torch.jit.script
 def _solve_box_qp_batch_adaptive_jit(
     D: torch.Tensor,
@@ -516,6 +579,16 @@ def _solve_box_qp_2(
 
 
 def _solve_box_qp_batch(
+    D: torch.Tensor,
+    d: torch.Tensor,
+    lower_bound: torch.Tensor,
+    n_sweeps: int = 50,
+) -> torch.Tensor:
+    x = _solve_box_qp_batch_fixed(D, d, lower_bound, n_sweeps)
+    return x if d.shape[1] <= 2 else _finish_box_qp(D, d, lower_bound, x)
+
+
+def _solve_box_qp_batch_fixed(
     D: torch.Tensor,
     d: torch.Tensor,
     lower_bound: torch.Tensor,
