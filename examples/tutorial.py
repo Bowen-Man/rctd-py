@@ -31,8 +31,12 @@ def _(mo):
     ## Installation
 
     ```bash
-    pip install rctd-py   # CPU (works everywhere; GPU auto-detected if CUDA available)
+    uv pip install rctd-py   # or: pip install rctd-py
     ```
+
+    rctd-py uses a GPU when PyTorch sees one. GPU builds of PyTorch, older NVIDIA drivers and
+    offline installs are covered in the
+    [installation guide](https://rctd-py.readthedocs.io/en/latest/installation.html).
     """)
     return
 
@@ -74,6 +78,8 @@ def _(mo):
     - **Spatial**: 100 Slide-seq beads from mouse cerebellum
 
     The data is small (~500 KB) and downloaded directly from the spacexr GitHub repository.
+    The first `run_rctd` call also downloads the likelihood tables (Q-matrices, 404 MB) once and
+    caches them.
     """)
     return
 
@@ -187,8 +193,8 @@ def _(mo):
     | Mode | Description | Best for |
     |------|-------------|----------|
     | `full` | Estimates continuous weights for all cell types simultaneously | Visium, continuous mixtures |
-    | `doublet` | Classifies each bead as singlet or doublet, assigns 1–2 types | Slide-seq, sparse spatial |
-    | `multi` | Greedy forward selection of up to 4 cell types per bead | Xenium, MERFISH, dense platforms |
+    | `doublet` | Classifies each bead as singlet or doublet, assigns 1–2 types | Slide-seq, Visium HD bins, segmented cells (Xenium, MERFISH, CosMx) |
+    | `multi` | Greedy forward selection of up to 4 cell types per bead | Spots expected to hold more than 2 types (an alternative to `full`) |
     """)
     return
 
@@ -196,7 +202,7 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Doublet Mode (default for Slide-seq)
+    ### Doublet Mode (the default)
 
     This is the mode used in the original spacexr vignette. It classifies each bead as
     a singlet (one dominant cell type) or doublet (two cell types).
@@ -385,14 +391,15 @@ def _(mo):
     mo.md(r"""
     ### Weight Heatmap
 
-    Full-mode weights across all beads, showing the estimated proportion of each cell type.
+    Full-mode weights across all beads, for the cell types with a mean weight above 0.01. The
+    weights are not normalised (see above), so a bead's row need not sum to 1.
     """)
     return
 
 
 @app.cell
 def _(cell_type_names, dominant_idx, np, plt, result_full):
-    # --- Plot 3: Weight heatmap (full mode, top cell types) ---
+    # Weight heatmap (full mode, top cell types)
     # Sort beads by dominant type for cleaner visualization
     order = np.lexsort((result_full.weights.max(axis=1), dominant_idx))
     active_mask = result_full.weights.mean(axis=0) > 0.01
@@ -415,8 +422,9 @@ def _(mo):
     mo.md(r"""
     ### Doublet Mode Details
 
-    For each bead classified as a doublet, RCTD identifies the two most likely
-    cell types and their proportions.
+    Doublet mode reports two cell types and their weights for every bead, whatever its class.
+    Both types apply only to doublets; for a singlet the first type is the call, and rejects
+    should be discarded.
     """)
     return
 
@@ -450,12 +458,11 @@ def _(mo):
     | `UMI_min_sigma` | 300 | Minimum UMI count for beads used in sigma estimation |
     | `N_fit` | 100 | Number of beads used to estimate sigma |
     | `MAX_MULTI_TYPES` | 4 | Max cell types per bead in multi mode |
-    | `max_iter` | 50 | Maximum IRWLS iterations |
     | `DOUBLET_THRESHOLD` | 20.0 | Singlet-vs-doublet log-likelihood gap (doublet mode) |
     | `CONFIDENCE_THRESHOLD` | 5.0 | Confidence margin for selected types (doublet/multi) |
     | `compile` | `True` | Use `torch.compile`; set `False` (or pass `--no-compile`) to fall back to TorchScript JIT (no CUDA dev headers needed) |
 
-    See [`RCTDConfig` in `_types.py`](https://github.com/p-gueguen/rctd-py/blob/main/src/rctd/_types.py)
+    See the [`RCTDConfig` reference](https://rctd-py.readthedocs.io/en/latest/generated/rctd.RCTDConfig.html)
     for the full list including bulk-fit cutoffs (`gene_cutoff`, `fc_cutoff`, …).
 
     The `batch_size` argument to `run_rctd` controls how many beads are processed
@@ -467,7 +474,7 @@ def _(mo):
 @app.cell
 def _(RCTDConfig, reference, run_rctd, spatial_adata):
     # Custom configuration example
-    _config = RCTDConfig(UMI_min=100, N_fit=100, MAX_MULTI_TYPES=4, max_iter=50)
+    _config = RCTDConfig(UMI_min=100, N_fit=100, MAX_MULTI_TYPES=4)
     result = run_rctd(spatial_adata, reference, mode='full', config=_config, batch_size=5000)
     print(f'Custom run: {result.weights.shape}')
     return
