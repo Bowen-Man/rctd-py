@@ -5,7 +5,7 @@ description: GPU-accelerated Python RCTD cell type deconvolution for spatial tra
 
 # rctd-py: GPU-Accelerated Spatial Deconvolution
 
-Python reimplementation of RCTD (Cable et al., *Nature Biotechnology* 2022) with PyTorch GPU acceleration. 10-57× faster than R `spacexr` in doublet mode (15 datasets, one L40S vs 8 R cores) with >99% cell-type-call concordance on identical pixel sets. Pure Python on PyTorch; runs on CPU or GPU, no R runtime required.
+Python reimplementation of RCTD (Cable et al., *Nature Biotechnology* 2022) with PyTorch GPU acceleration. 10-57× faster than R `spacexr` in doublet mode (15 datasets, one L40S vs 8 R cores) with the same calls as R `spacexr` wherever both pick the same sigma (99.0-99.9% of spot classes when sigma differs by 0.01-0.02, as between two R runs; 19 datasets, v0.4.0). Pure Python on PyTorch; runs on CPU or GPU, no R runtime required.
 
 ## When to use
 
@@ -324,7 +324,7 @@ saveRDS(spatial_obj, "spatial_rctd.rds")
 ## Gotchas
 
 - **`spot_class` is 0-indexed in Python; R `spacexr` is 1-indexed.** When cross-comparing, add 1 to the Python values (or subtract 1 from the R values).
-- **MT-gene case sensitivity vs R `spacexr`.** The DE filter is case-insensitive (`.lower().startswith("mt-")`), which drops human `MT-CO1`-style symbols from the candidate pool. R `spacexr`'s case-sensitive `grep("mt-", ...)` keeps them. Net effect on real data: rctd-py keeps fewer pixels because the differing `gene_list_bulk` shifts the per-pixel `counts_MIN` filter. Cell-type calls on the pixels both runs keep agree at ~100%.
+- **MT genes: R's rule since 0.4.0.** The DE filter drops names containing `mt-` case-sensitively, as R `spacexr`'s `grep("mt-", ...)` does: mouse `mt-Co1` goes, human `MT-CO1` stays a candidate. Up to 0.3.9 rctd-py also dropped human `MT-` genes, which changed `gene_list_bulk` and so the `counts_MIN` pixel filter (fewer pixels kept than R on human data).
 - **Concordance metrics that count filtered pixels as mismatches understate agreement.** When the pixel-filtering decision differs between rctd-py and R `spacexr`, a `concordance = same_first_type / total_pixels` will appear low even when the kept-pixel calls agree exactly. Compare assignments only on the pixel intersection.
 - **Doublet mode under-assigns fine subtypes on small panels.** When a reference fine subtype has markers that the spatial panel can't reliably detect (e.g. CD4 markers on a 300-500-gene Xenium panel), doublet mode falls back to a coarser label or `doublet_uncertain` rather than over-calling the subtype. Always `value_counts()` your subtype × group counts before slicing by subtype for downstream analysis -- sparsity at the call layer can look like a biological finding. To re-split a coarse pool into subtypes, use a reference classifier (SingleR, ProjecTILs) rather than a per-cell marker argmax (low capture biases argmax toward high-capture markers).
 - **`batch_size="auto"` on a shared GPU can OOM mid-run.** It sizes from free VRAM at startup; if another job grows afterwards, the IRWLS launch can fail. Pin an integer `batch_size` (e.g. 5000-8000) on contested nodes; the CLI's `--batch-size` is always an integer (default 10000).

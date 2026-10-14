@@ -495,7 +495,7 @@ def _(mo):
     |-----------|---------|-------------|
     | `UMI_min` | 100 | Minimum UMI count to include a bead |
     | `UMI_min_sigma` | 300 | Minimum UMI count for beads used in sigma estimation |
-    | `N_fit` | 100 | Number of beads used to estimate sigma |
+    | `N_fit` | 1000 | Number of beads used to estimate sigma |
     | `MAX_MULTI_TYPES` | 4 | Max cell types per bead in multi mode |
     | `DOUBLET_THRESHOLD` | 20.0 | Singlet-vs-doublet log-likelihood gap (doublet mode) |
     | `CONFIDENCE_THRESHOLD` | 5.0 | Confidence margin for selected types (doublet/multi) |
@@ -513,7 +513,7 @@ def _(mo):
 @app.cell
 def _(RCTDConfig, reference, run_rctd, spatial_adata):
     # Custom configuration example
-    _config = RCTDConfig(UMI_min=100, N_fit=100, MAX_MULTI_TYPES=4)
+    _config = RCTDConfig(UMI_min=100, MAX_MULTI_TYPES=4)
     result = run_rctd(spatial_adata, reference, mode='full', config=_config, batch_size=5000)
     print(f'Custom run: {result.weights.shape}')
     return

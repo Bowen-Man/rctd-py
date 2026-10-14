@@ -38,8 +38,8 @@ multi mode for larger spots.
 
 ## Configuration
 
-{class}`~rctd.RCTDConfig` holds every parameter; its defaults match R spacexr's except `N_fit`
-(100 here, 1000 in R; see {doc}`r_spacexr`).
+{class}`~rctd.RCTDConfig` holds every parameter; its defaults match R spacexr's (see
+{doc}`r_spacexr`).
 
 ```python
 from rctd import RCTDConfig

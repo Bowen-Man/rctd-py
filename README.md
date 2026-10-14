@@ -29,7 +29,7 @@ Deconvolve spatial transcriptomics spots (Visium, Xenium, MERFISH, Slide-seq, �
 | | |
 |---|---|
 | ⚡ **10–57x faster than R spacexr** | Doublet mode on 15 datasets, one GPU vs 8 R cores. Xenium Prime 5K, 503k cells fitted: **34 min** vs 31 hours in R |
-| 🎯 **Agrees with R spacexr** | 99.2–99.7% dominant-type agreement; most of the gap is sigma, which R itself estimates differently run to run ([details](https://rctd-py.readthedocs.io/en/latest/r_spacexr.html)) |
+| 🎯 **Matches R spacexr** | Same calls as R wherever both pick the same sigma (11 of 19 datasets); 99.0–99.9% of spot classes on the rest, where sigma differs by 0.01–0.02, as it does between two R runs ([details](https://rctd-py.readthedocs.io/en/latest/r_spacexr.html)) |
 | 🔧 **Familiar to spacexr users** | Same algorithm and, with a few exceptions, the same parameter names ([mapping](https://rctd-py.readthedocs.io/en/latest/r_spacexr.html)) |
 | 📦 **`pip install rctd-py`** | Pure Python, works on CPU out of the box (3.7–14x faster than R in doublet mode), uses a GPU when there is one |
 | 🧬 **Whole-transcriptome ready** | 10x **Atera** WTA (18,028-gene panel): 714k cells deconvolved in 9 min on GPU (doublet mode, 7 cell types) |

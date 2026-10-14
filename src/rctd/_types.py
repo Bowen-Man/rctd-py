@@ -10,7 +10,7 @@ class RCTDConfig(NamedTuple):
     """RCTD configuration parameters.
 
     Field names keep R spacexr's spelling. Defaults match R's ``create.RCTD()`` and its internal
-    config, except ``N_fit`` (100 here, 1000 in R).
+    config.
     """
 
     #: Min normalised expression for the bulk gene list (``gene_cutoff`` in R).

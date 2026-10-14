@@ -22,9 +22,11 @@ On one GPU, rctd-py is 10-57x faster than R in doublet mode (median 16x), 5-119x
 - **Runs**: an untimed warm-up on 2,000 cells fills the `torch.compile` cache, then rctd-py runs three
   times and the tables give the median. R ran once per dataset and mode.
 - **Cells** are the pixels fitted: those with at least 20 UMIs, the same filter on both sides.
-- **Version**: rctd-py's development code after 0.3.9 (October 2026). On the GPU it runs at the same
-  speed as 0.3.9: the 39 GPU timings that 0.3.9 also has (all but the two Slide-seq datasets) are
-  within 6% of 0.3.9's.
+- **Version**: rctd-py's development code after 0.3.9 (October 2026), before the R-parity changes
+  of 0.4.0. On the GPU it runs at the same speed as 0.3.9: the 39 GPU timings that 0.3.9 also has
+  (all but the two Slide-seq datasets) are within 6% of 0.3.9's. 0.4.0 adds 5-20 s per run for
+  sigma estimation (`N_fit` 1000 instead of 100); its exact box-QP solve costs no measurable time
+  (Visium HD K=78, doublet: 1,718 s vs 1,726 s).
 
 ## Runtime
 
