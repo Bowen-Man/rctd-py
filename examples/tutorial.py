@@ -166,6 +166,35 @@ def _(anndata, bead_locs, np, pd, spatial_dge):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
+    ### The spatial data
+
+    Each bead at its position on the puck, coloured by its total UMI count. RCTD skips beads below
+    `UMI_min` (100 by default); the runs below set `UMI_min=1` to keep all 100 beads of this small
+    example.
+    """)
+    return
+
+
+@app.cell
+def _(np, plt, spatial_adata):
+    _numi = np.asarray(spatial_adata.X.sum(axis=1)).ravel()
+    fig_beads, _ax = plt.subplots(figsize=(7, 5.5))
+    _sc = _ax.scatter(spatial_adata.obs["x"], spatial_adata.obs["y"], c=np.log10(_numi), cmap="viridis",
+                      s=45, edgecolors="none")
+    _ax.set_aspect("equal")
+    _ax.set_xlabel("x")
+    _ax.set_ylabel("y")
+    _ax.set_title(f"{spatial_adata.n_obs} Slide-seq beads, mouse cerebellum")
+    fig_beads.colorbar(_sc, ax=_ax, shrink=0.8, label="log10 total UMI per bead")
+    print(f"Total UMI per bead: median {np.median(_numi):.0f}, range {_numi.min():.0f}-{_numi.max():.0f}; "
+          f"{(_numi >= 100).sum()} of {len(_numi)} beads have at least 100")
+    fig_beads
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     ## 3. Build Reference
 
     The `Reference` class takes a single-cell `AnnData` object and computes per-type
