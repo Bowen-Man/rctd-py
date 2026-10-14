@@ -18,13 +18,15 @@ jobs:
           python-version: "3.12"
 
       - name: Install ruff
-        run: pip install ruff
+        # Same version as the pre-commit hook (.pre-commit-config.yaml rev); bump both together.
+        # Pinned because new ruff releases change what is checked (0.17 added Markdown code blocks).
+        run: pip install ruff==0.17.0
 
       - name: Check linting
-        run: ruff check src/ tests/
+        run: ruff check src/ tests/ docs/
 
       - name: Check formatting
-        run: ruff format --check src/ tests/
+        run: ruff format --check src/ tests/ docs/
 
   test:
     runs-on: ubuntu-latest
