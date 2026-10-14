@@ -301,3 +301,34 @@ class TestSolveIRWLSBatchShared:
         )
         assert w.shape == (0, K)
         assert c.shape == (0,)
+
+
+def test_box_qp_is_exact_like_quadprog(monkeypatch):
+    """The batched QP must reach the exact optimum (R uses quadprog), also when 50
+    Gauss-Seidel sweeps fall short on an ill-conditioned D."""
+    import scipy.optimize
+
+    from rctd import _irwls
+
+    monkeypatch.setattr(_irwls, "_USE_COMPILE", False)  # JIT path: no compile wait on CPU runners
+    rng = np.random.default_rng(0)
+    N, K = 200, 12
+    Q = np.linalg.qr(rng.normal(size=(N, K, K)))[0]
+    ev = np.exp(rng.uniform(np.log(1e-5), 0, size=(N, K)))
+    ev[:, 0] = 1
+    D = Q @ (ev[:, :, None] * Q.transpose(0, 2, 1)) + 1e-7 * np.eye(K)
+    d = rng.normal(size=(N, K)) * 0.1
+    lb = -np.abs(rng.normal(size=(N, K))) * 0.05
+    exact = []
+    for Di, di, li in zip(D, d, lb):  # x = lb + y, y >= 0: NNLS on the Cholesky factor
+        L = np.linalg.cholesky(Di)
+        y, _ = scipy.optimize.nnls(L.T, np.linalg.solve(L, di - Di @ li), maxiter=100_000)
+        exact.append(li + y)
+    exact = np.array(exact)
+    Dt, dt, lt = (torch.tensor(a) for a in (D, d, lb))
+    fixed = _irwls._solve_box_qp_batch_fixed(Dt.clone(), dt.clone(), lt.clone()).numpy()
+    assert (
+        np.abs(fixed - exact).max() > 1e-3
+    )  # positive control: 50 sweeps alone are not exact here
+    x = _irwls._solve_box_qp_batch(Dt, dt, lt).numpy()
+    np.testing.assert_allclose(x, exact, atol=1e-7)

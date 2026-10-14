@@ -31,8 +31,8 @@ class RCTDConfig(NamedTuple):
     UMI_min_sigma: int = 300
     #: Max epochs of the sigma estimation loop.
     N_epoch: int = 8
-    #: Number of pixels sampled for sigma estimation.
-    N_fit: int = 100
+    #: Number of pixels sampled for sigma estimation (R's default, 1000).
+    N_fit: int = 1000
     #: Convergence threshold of the bulk platform-effect fit.
     MIN_CHANGE_BULK: float = 0.0001
     #: Convergence threshold of the per-pixel fits. Not read yet; the solvers use a fixed 0.001.
