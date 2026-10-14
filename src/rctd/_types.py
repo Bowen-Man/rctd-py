@@ -7,35 +7,63 @@ import torch
 
 
 class RCTDConfig(NamedTuple):
-    """RCTD configuration parameters."""
+    """RCTD configuration parameters.
 
+    Field names keep R spacexr's spelling. Defaults match R's ``create.RCTD()`` and its internal
+    config, except ``N_fit`` (100 here, 1000 in R).
+    """
+
+    #: Min normalised expression for the bulk gene list (``gene_cutoff`` in R).
     gene_cutoff: float = 0.000125
+    #: Min log fold change for the bulk gene list (``fc_cutoff`` in R).
     fc_cutoff: float = 0.5
+    #: Min normalised expression for the per-pixel DE gene list (``gene_cutoff_reg`` in R).
     gene_cutoff_reg: float = 0.0002
+    #: Min log fold change for the per-pixel DE gene list (``fc_cutoff_reg`` in R).
     fc_cutoff_reg: float = 0.75
+    #: Min total UMI for a spatial pixel to be fitted.
     UMI_min: int = 100
+    #: Max total UMI for a spatial pixel to be fitted.
     UMI_max: int = 20_000_000
+    #: Min counts a pixel needs on the bulk gene list.
     counts_MIN: int = 10
+    #: Min UMI for a pixel to be sampled for sigma estimation.
     UMI_min_sigma: int = 300
+    #: Max epochs of the sigma estimation loop.
     N_epoch: int = 8
+    #: Number of pixels sampled for sigma estimation.
     N_fit: int = 100
+    #: Convergence threshold of the bulk platform-effect fit.
     MIN_CHANGE_BULK: float = 0.0001
+    #: Convergence threshold of the per-pixel fits. Not read yet; the solvers use a fixed 0.001.
     MIN_CHANGE_REG: float = 0.001
+    #: Min observations for a gene in DE gene selection.
     MIN_OBS: int = 3
+    #: Max cell types per pixel in multi mode.
     MAX_MULTI_TYPES: int = 4
+    #: Score margin within which two fits count as a tie (doublet and multi mode).
     CONFIDENCE_THRESHOLD: float = 5.0
+    #: Score gain needed to call a doublet (doublet mode) or to add another type (multi mode).
     DOUBLET_THRESHOLD: float = 20.0
+    #: Max IRWLS iterations per pixel. Not read yet; the solvers use a fixed 50 (25 for scoring).
     max_iter: int = 50
+    #: IRWLS step size. Not read yet; the solvers use a fixed 0.3.
     step_size: float = 0.3
+    #: Largest count value in the likelihood tables.
     K_val: int = 1000
-    dtype: str = "float64"  # "float32" or "float64"; float32 saves GPU memory
-    device: str = "auto"  # "auto", "cpu", or "cuda"; auto uses GPU if available
-    compile: bool = True  # Use torch.compile; False forces eager mode
-    class_df: dict[str, str] | None = None  # Doublet mode: cell_type -> class; None = identity
-    # Override the per-arch K cutoff for staying on GPU eigh in _psd_batch.
-    # None = use arch-based default (K<=16 on sm_<9, K<=128 on sm_>=9). Set
-    # higher to force GPU eigh on older arches when the CPU offload is the
-    # bottleneck (issue #22 — K=38 on V100/L20). Ignored on CPU runs.
+    #: ``"float64"`` (R arithmetic) or ``"float32"`` (1.2-2x faster and half the VRAM on GPUs
+    #: with limited fp64 throughput; measured on an L40S).
+    dtype: str = "float64"
+    #: ``"auto"`` (GPU if available), ``"cpu"`` or ``"cuda"``.
+    device: str = "auto"
+    #: Use ``torch.compile``; ``False`` forces eager mode.
+    compile: bool = True
+    #: ``{cell_type -> class}`` mapping for hierarchical fallback in doublet mode;
+    #: ``None`` makes each type its own class.
+    class_df: dict[str, str] | None = None
+    #: Override the per-architecture K cutoff for GPU ``eigh`` (default ``None``, meaning K <= 16 on
+    #: sm < 9 and K <= 128 on sm >= 9). Raise it when the CPU offload is the bottleneck (issue #22).
+    #: CPU runs ignore it.
     eigh_threshold: int | None = None
 
 
@@ -81,44 +109,81 @@ def auto_batch_size(
 
 
 class FullResult(NamedTuple):
-    """Result from full mode RCTD."""
+    """Result from full mode RCTD.
 
-    weights: np.ndarray  # (N, K) float32
+    Arrays cover only the pixels that passed the UMI and ``counts_MIN`` filters;
+    ``spatial[result.pixel_mask]`` lines up row for row with them.
+    """
+
+    #: (N, K) unnormalised cell type weights.
+    weights: np.ndarray
+    #: Cell type names; column order of ``weights``.
     cell_type_names: list[str]
-    converged: np.ndarray  # (N,) bool
-    pixel_mask: np.ndarray | None = None  # (N_total,) bool — which pixels passed filtering
+    #: (N,) whether the per-pixel fit converged.
+    converged: np.ndarray
+    #: (N_total,) which input pixels passed filtering.
+    pixel_mask: np.ndarray | None = None
 
 
 class DoubletResult(NamedTuple):
-    """Result from doublet mode RCTD."""
+    """Result from doublet mode RCTD.
 
-    weights: np.ndarray  # (N, K) float32
-    weights_doublet: np.ndarray  # (N, 2) float32
-    spot_class: np.ndarray  # (N,) int: 0=reject, 1=singlet, 2=doublet_certain, 3=doublet_uncertain
-    first_type: np.ndarray  # (N,) int indices into cell_type_names
-    second_type: np.ndarray  # (N,) int indices into cell_type_names
-    first_class: np.ndarray  # (N,) bool
-    second_class: np.ndarray  # (N,) bool
-    min_score: np.ndarray  # (N,) float
-    singlet_score: np.ndarray  # (N,) float
+    Arrays cover only the pixels that passed the UMI and ``counts_MIN`` filters;
+    ``spatial[result.pixel_mask]`` lines up row for row with them.
+    """
+
+    #: (N, K) full-mode weights fitted before the doublet step.
+    weights: np.ndarray
+    #: (N, 2) normalised weights of ``first_type`` and ``second_type``.
+    weights_doublet: np.ndarray
+    #: (N,) 0 = reject, 1 = singlet, 2 = doublet_certain, 3 = doublet_uncertain
+    #: (see ``SPOT_CLASS_NAMES``).
+    spot_class: np.ndarray
+    #: (N,) index into ``cell_type_names`` of the first type.
+    first_type: np.ndarray
+    #: (N,) index into ``cell_type_names`` of the second type.
+    second_type: np.ndarray
+    #: (N,) ``True`` when the first type is only confident at the class level (``class_df``).
+    first_class: np.ndarray
+    #: (N,) ``True`` when the second type is only confident at the class level (``class_df``).
+    second_class: np.ndarray
+    #: (N,) score of the best pair of types (negative log-likelihood).
+    min_score: np.ndarray
+    #: (N,) score of the best single-type fit.
+    singlet_score: np.ndarray
+    #: Cell type names; column order of ``weights``.
     cell_type_names: list[str]
-    pixel_mask: np.ndarray | None = None  # (N_total,) bool — which pixels passed filtering
-    # (N,) str, class of first/second_type when class_df was provided; else None
+    #: (N_total,) which input pixels passed filtering.
+    pixel_mask: np.ndarray | None = None
+    #: (N,) class of ``first_type`` when ``class_df`` was given, else ``None``.
     first_class_name: np.ndarray | None = None
+    #: (N,) class of ``second_type`` when ``class_df`` was given, else ``None``.
     second_class_name: np.ndarray | None = None
 
 
 class MultiResult(NamedTuple):
-    """Result from multi mode RCTD."""
+    """Result from multi mode RCTD.
 
-    weights: np.ndarray  # (N, K) float32
-    sub_weights: np.ndarray  # (N, MAX_MULTI_TYPES) float32, padded
-    cell_type_indices: np.ndarray  # (N, MAX_MULTI_TYPES) int, padded with -1
-    n_types: np.ndarray  # (N,) int, number of types per pixel
-    conf_list: np.ndarray  # (N, MAX_MULTI_TYPES) bool
-    min_score: np.ndarray  # (N,) float
+    Arrays cover only the pixels that passed the UMI and ``counts_MIN`` filters;
+    ``spatial[result.pixel_mask]`` lines up row for row with them.
+    """
+
+    #: (N, K) full-mode weights fitted before type selection.
+    weights: np.ndarray
+    #: (N, MAX_MULTI_TYPES) weights of the selected types, padded with 0.
+    sub_weights: np.ndarray
+    #: (N, MAX_MULTI_TYPES) indices of the selected types, padded with -1.
+    cell_type_indices: np.ndarray
+    #: (N,) number of selected types per pixel.
+    n_types: np.ndarray
+    #: (N, MAX_MULTI_TYPES) whether each selected type is confident.
+    conf_list: np.ndarray
+    #: (N,) score of the selected set of types.
+    min_score: np.ndarray
+    #: Cell type names; indexed by ``cell_type_indices``.
     cell_type_names: list[str]
-    pixel_mask: np.ndarray | None = None  # (N_total,) bool — which pixels passed filtering
+    #: (N_total,) which input pixels passed filtering.
+    pixel_mask: np.ndarray | None = None
 
 
 # Spot class encoding
