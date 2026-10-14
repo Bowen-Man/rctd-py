@@ -73,7 +73,11 @@ class TestReference:
         assert np.all(renorm >= 0)
 
     def test_de_genes_filters_mt_genes(self):
-        """Mitochondrial genes (mt-*) should be excluded from DE genes."""
+        """Genes whose name contains "mt-" are excluded, case-sensitively, as in R.
+
+        spacexr's get_de_genes drops grep("mt-", gene_list): mouse mt-Co1 and any name holding
+        "mt-" go, human MT-ND1 stays a candidate.
+        """
         import anndata
 
         rng = np.random.default_rng(42)
@@ -94,6 +98,7 @@ class TestReference:
         gene_names = [f"Gene_{i}" for i in range(n_genes)]
         gene_names[0] = "mt-Co1"
         gene_names[1] = "MT-ND1"
+        gene_names[2] = "Xmt-1"
 
         adata = anndata.AnnData(X=counts, obs={"cell_type": cell_types})
         adata.var_names = gene_names
@@ -103,7 +108,8 @@ class TestReference:
         de_genes = ref.get_de_genes(fc_thresh=0.5, expr_thresh=1e-4)
 
         assert "mt-Co1" not in de_genes
-        assert "MT-ND1" not in de_genes
+        assert "Xmt-1" not in de_genes
+        assert "MT-ND1" in de_genes  # positive control: an equally DE gene that R keeps
 
     def test_missing_column_raises(self, synthetic_reference):
         ref_adata, _, _ = synthetic_reference

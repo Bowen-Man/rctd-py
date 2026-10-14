@@ -187,8 +187,9 @@ class Reference:
         # Start with all gene indices
         gene_list = list(range(self.n_genes))
 
-        # Filter mitochondrial genes (case-insensitive mt- prefix)
-        gene_list = [g for g in gene_list if not self.gene_names[g].lower().startswith("mt-")]
+        # Drop mitochondrial genes as R does: grep("mt-", gene_list), case-sensitive and anywhere in
+        # the name, so mouse mt-Co1 goes and human MT-CO1 stays a candidate
+        gene_list = [g for g in gene_list if "mt-" not in self.gene_names[g]]
 
         # Filter by spatial observation count if provided
         if spatial_bulk is not None:
