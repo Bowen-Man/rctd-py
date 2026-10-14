@@ -382,36 +382,46 @@ def _(
     cell_type_names,
     class_labels,
     dominant_idx,
+    np,
     plt,
     result_doublet,
     result_multi,
     spatial_adata,
 ):
-    fig_spatial, axes = plt.subplots(1, 3, figsize=(16, 5))
-    x = spatial_adata.obs['x'].values
-    y = spatial_adata.obs['y'].values
-    cmap = plt.colormaps.get_cmap('tab20').resampled(len(cell_type_names))
-    sc = axes[0].scatter(x, y, c=dominant_idx, cmap=cmap, vmin=-0.5, vmax=len(cell_type_names) - 0.5, s=30, alpha=0.9, edgecolors='none')
-    axes[0].set_title('Full mode\n(dominant cell type)')
-    axes[0].set_aspect('equal')
-    axes[0].set_xlabel('x')
-    axes[0].set_ylabel('y')
-    class_colors = {0: '#888888', 1: '#4C78A8', 2: '#F58518', 3: '#E45756'}
-    for cls_id, color in class_colors.items():
-        mask = result_doublet.spot_class == cls_id
-        if mask.any():
-            axes[1].scatter(x[mask], y[mask], c=color, s=30, alpha=0.9, edgecolors='none', label=class_labels[cls_id])
-    axes[1].set_title('Doublet mode\n(spot class)')
-    axes[1].set_aspect('equal')
-    axes[1].set_xlabel('x')
-    axes[1].legend(fontsize=8, markerscale=1.2, loc='upper right')
-    sc2 = axes[2].scatter(x, y, c=result_multi.n_types, cmap='viridis', vmin=0.5, vmax=4.5, s=30, alpha=0.9, edgecolors='none')
-    axes[2].set_title('Multi mode\n(# cell types per bead)')
-    axes[2].set_aspect('equal')
-    axes[2].set_xlabel('x')
-    plt.colorbar(sc2, ax=axes[2], ticks=[1, 2, 3, 4], label='# types')
-    plt.suptitle('RCTD Spatial Deconvolution — Slide-seq Cerebellum', fontsize=13, y=1.01)
-    plt.tight_layout()
+    _x = spatial_adata.obs["x"].values
+    _y = spatial_adata.obs["y"].values
+    fig_spatial = plt.figure(figsize=(9, 9.5), layout="constrained")
+    _gs = fig_spatial.add_gridspec(2, 2, height_ratios=[1.15, 1])
+    _full, _dbl, _multi = (fig_spatial.add_subplot(_gs[0, :]), fig_spatial.add_subplot(_gs[1, 0]),
+                           fig_spatial.add_subplot(_gs[1, 1]))
+
+    # Full mode: dominant cell type, one legend entry per type that is dominant somewhere
+    _cmap = plt.colormaps.get_cmap("tab20").resampled(len(cell_type_names))
+    for _k in np.unique(dominant_idx):
+        _m = dominant_idx == _k
+        _full.scatter(_x[_m], _y[_m], color=_cmap(_k), s=32, edgecolors="none", label=cell_type_names[_k])
+    _full.set_title("Full mode: dominant cell type")
+    _full.legend(fontsize=8, markerscale=1.3, loc="center left", bbox_to_anchor=(1.01, 0.5), frameon=False)
+
+    # Doublet mode: spot class
+    _class_colors = {0: "#888888", 1: "#4C78A8", 2: "#F58518", 3: "#E45756"}
+    for _cls, _color in _class_colors.items():
+        _m = result_doublet.spot_class == _cls
+        if _m.any():
+            _dbl.scatter(_x[_m], _y[_m], color=_color, s=22, edgecolors="none", label=class_labels[_cls])
+    _dbl.set_title("Doublet mode: spot class")
+    _dbl.legend(fontsize=8, markerscale=1.3, loc="lower left", frameon=False)
+
+    # Multi mode: number of cell types kept per bead
+    _sc = _multi.scatter(_x, _y, c=result_multi.n_types, cmap="viridis", vmin=0.5, vmax=4.5, s=22,
+                         edgecolors="none")
+    _multi.set_title("Multi mode: cell types per bead")
+    fig_spatial.colorbar(_sc, ax=_multi, ticks=[1, 2, 3, 4], shrink=0.8, label="# types")
+
+    for _ax in (_full, _dbl, _multi):
+        _ax.set_aspect("equal")
+        _ax.set_xlabel("x")
+        _ax.set_ylabel("y")
     fig_spatial
 
 
