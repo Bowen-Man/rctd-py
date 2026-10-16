@@ -28,7 +28,7 @@ Deconvolve spatial transcriptomics spots (Visium, Xenium, MERFISH, Slide-seq, �
 
 | | |
 |---|---|
-| ⚡ **10–57x faster than R spacexr** | Doublet mode on 15 datasets, one GPU vs 8 R cores. Xenium Prime 5K, 503k cells fitted: **34 min** vs 31 hours in R |
+| ⚡ **10–57x faster than R spacexr** | Doublet mode on 19 datasets, one GPU vs 8 R cores. Xenium Prime 5K, 503k cells fitted: **34 min** vs 31 hours in R |
 | 🎯 **Matches R spacexr** | Same calls as R wherever both pick the same sigma (11 of 19 datasets); 99.0–99.9% of spot classes on the rest, where sigma differs by 0.01–0.02, as it does between two R runs ([details](https://rctd-py.readthedocs.io/en/latest/r_spacexr.html)) |
 | 🔧 **Familiar to spacexr users** | Same algorithm and, with a few exceptions, the same parameter names ([mapping](https://rctd-py.readthedocs.io/en/latest/r_spacexr.html)) |
 | 📦 **`pip install rctd-py`** | Pure Python, works on CPU out of the box (3.7–14x faster than R in doublet mode), uses a GPU when there is one |
@@ -78,7 +78,7 @@ All options and the output layout: [command line reference](https://rctd-py.read
 ## Benchmarks
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/p-gueguen/rctd-py/main/docs/benchmark.png" alt="Doublet mode wall time of R spacexr, rctd-py CPU and rctd-py GPU on 15 datasets" width="900">
+  <img src="https://raw.githubusercontent.com/p-gueguen/rctd-py/main/docs/benchmark.png" alt="Doublet mode wall time of R spacexr, rctd-py CPU and rctd-py GPU on 19 datasets" width="900">
 </p>
 
 rctd-py on one NVIDIA L40S or 8 CPU threads, R spacexr 2.2.1 on 8 cores; rctd-py points are the

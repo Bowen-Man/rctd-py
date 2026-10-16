@@ -67,11 +67,15 @@ version matters (`nvidia-smi`, top right).
 
 ### GPU memory
 
-Peak VRAM grows with `batch_size` and with the number of genes and cell types. From Python,
-`run_rctd` defaults to `batch_size="auto"`, sized from the free GPU memory; the CLI defaults to
-`--batch-size 10000`. At `batch_size=10000` in float64, the {doc}`benchmarks <benchmarks>` peaked
-at 5.3-5.6 GiB on the small Xenium panels (242-376 genes) and at 7-16 GiB on data with thousands
-of genes. Set it explicitly to fit a smaller card or a shared GPU:
+Peak VRAM grows with `batch_size` and with the number of genes and cell types. It also grows with
+the number of pixels, because rctd-py copies the whole count matrix (pixels x fitted genes) to the
+GPU: for 557,300 Visium HD bins and 4,638 genes that matrix alone is 19 GiB in float64, and the run
+peaked at 24-29 GiB whatever the mode. `batch_size` does not shrink that part; `dtype="float32"`
+halves it. From Python, `run_rctd` defaults to `batch_size="auto"`, sized from the free GPU memory;
+the CLI defaults to `--batch-size 10000`. At `batch_size=10000` in float64, the
+{doc}`benchmarks <benchmarks>` peaked at 5.3-5.6 GiB on the small Xenium panels (242-376 genes) and
+at 7-16 GiB on the other datasets (up to 714,535 pixels). Set it explicitly to fit a smaller card
+or a shared GPU:
 
 | Available VRAM | Recommended `batch_size` |
 |---|---|
@@ -79,8 +83,8 @@ of genes. Set it explicitly to fit a smaller card or a shared GPU:
 | 8-16 GB | 5,000 |
 | < 8 GB | 2,000 |
 
-Peak host RAM ranged from 4 to 113 GiB on the benchmark datasets and grows with pixels times
-genes: the 714,535-cell, 18,028-gene Atera dataset needed 113 GiB.
+Peak host RAM ranged from 4 to 136 GiB on the benchmark datasets and is highest on large
+whole-transcriptome data: 136 GiB for 557,300 Visium HD bins, 113 GiB for 714,535 Atera cells.
 
 ## Known issue: NVRTC missing on Blackwell + CUDA 13
 

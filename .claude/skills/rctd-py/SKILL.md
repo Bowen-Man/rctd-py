@@ -5,7 +5,7 @@ description: GPU-accelerated Python RCTD cell type deconvolution for spatial tra
 
 # rctd-py: GPU-Accelerated Spatial Deconvolution
 
-Python reimplementation of RCTD (Cable et al., *Nature Biotechnology* 2022) with PyTorch GPU acceleration. 10-57× faster than R `spacexr` in doublet mode (15 datasets, one L40S vs 8 R cores) with the same calls as R `spacexr` wherever both pick the same sigma (99.0-99.9% of spot classes when sigma differs by 0.01-0.02, as between two R runs; 19 datasets, v0.4.0). Pure Python on PyTorch; runs on CPU or GPU, no R runtime required.
+Python reimplementation of RCTD (Cable et al., *Nature Biotechnology* 2022) with PyTorch GPU acceleration. 10-57× faster than R `spacexr` in doublet mode (19 datasets, one L40S vs 8 R cores) with the same calls as R `spacexr` wherever both pick the same sigma (99.0-99.9% of spot classes when sigma differs by 0.01-0.02, as between two R runs; 19 datasets, v0.4.0). Pure Python on PyTorch; runs on CPU or GPU, no R runtime required.
 
 ## When to use
 
@@ -159,7 +159,7 @@ assert "cell_type" in adata.obs.columns
 | `--output / -o` | `<stem>_rctd.h5ad` | Output h5ad path |
 | `--device` | `auto` | `auto`, `cpu`, `cuda` |
 | `--batch-size` | `10000` | Pixels per IRWLS launch (integer). `"auto"` (sized from free VRAM) exists only in Python `run_rctd(batch_size="auto")` |
-| `--dtype` | `float64` | `float32` is up to 2.3× faster in doublet mode (median 1.6× on the 15 benchmark datasets, L40S; no gain on the smallest), with ≥ 99.997% of spot classes unchanged (see GPU notes below) |
+| `--dtype` | `float64` | `float32` is up to 2.3× faster in doublet mode (median 1.6× on 15 of the benchmark datasets, L40S; no gain on the smallest), with ≥ 99.997% of spot classes unchanged (see GPU notes below) |
 | `--cell-type-col` | `cell_type` | Reference `obs` column with labels |
 | `--umi-min` | `100` | **Use 20 for Xenium**; 100 is the R `spacexr` default |
 | `--umi-max` | `20000000` | Per-pixel UMI ceiling |
@@ -183,7 +183,7 @@ assert "cell_type" in adata.obs.columns
 
 ### `dtype="float32"` is usually the better default on GPU
 
-The default `dtype="float64"` matches R `spacexr` arithmetic and is the safest choice when validating against R. On a data-center GPU with strong fp64 (A100, H100) the cost is small. On consumer / workstation GPUs (RTX, L40S, Blackwell sm_120) fp64 throughput is 1/32-1/64 of fp32, and `dtype="float32"` is **up to 2.3× faster in doublet mode (median 1.6× on the 15 benchmark datasets, L40S; no gain on the smallest), with ≥ 99.997% of spot classes unchanged**. In a synthetic example (L40S, sm_89, N=20000 spots, K=30 types): 76 s → 39 s; `spot_class` agreement with the fp64 run was 100%, weights diff `<1e-6`. See `tests/test_fp32_concordance.py` for the locked-in assertion.
+The default `dtype="float64"` matches R `spacexr` arithmetic and is the safest choice when validating against R. On a data-center GPU with strong fp64 (A100, H100) the cost is small. On consumer / workstation GPUs (RTX, L40S, Blackwell sm_120) fp64 throughput is 1/32-1/64 of fp32, and `dtype="float32"` is **up to 2.3× faster in doublet mode (median 1.6× on 15 of the benchmark datasets, L40S; no gain on the smallest), with ≥ 99.997% of spot classes unchanged**. In a synthetic example (L40S, sm_89, N=20000 spots, K=30 types): 76 s → 39 s; `spot_class` agreement with the fp64 run was 100%, weights diff `<1e-6`. See `tests/test_fp32_concordance.py` for the locked-in assertion.
 
 For validation against R `spacexr`, stay on fp64 (closest to R's arithmetic) and pass R's sigma with `--sigma-override` / `sigma_override`; results agree closely, not bit for bit.
 
@@ -211,9 +211,10 @@ Peak VRAM grows with the batch size and with the number of genes and cell types;
 |------|------:|--:|----------:|
 | Xenium panels | 242-376 | 22-45 | 5.3-5.6 GiB |
 | Xenium Prime 5K | 4,929 | 40 | 13 GiB |
-| Whole transcriptome (Visium, Visium HD, Slide-seq, CosMx, Atera) | 15-23k | 7-78 | 7-16 GiB |
+| Whole transcriptome (Visium, Visium HD, Slide-seq, CosMx, Atera), up to 714k pixels | 15-23k | 7-78 | 7-16 GiB |
+| Visium HD breast 8 µm bins, 557k pixels | 17.6k | 40 | 24-29 GiB |
 
-On a smaller GPU, lower `--batch-size` (e.g. 2000-5000), or use `--dtype float32`, which about halves the peak on whole-transcriptome data.
+rctd-py copies the whole count matrix (pixels × fitted genes) to the GPU, so very large datasets need VRAM whatever the batch size: 557k bins × 4,638 genes is 19 GiB in float64 alone. On a smaller GPU, lower `--batch-size` (e.g. 2000-5000), or use `--dtype float32`, which about halves the peak on whole-transcriptome data, the count matrix included.
 
 `run_rctd(batch_size="auto")` (Python API only; the CLI takes an integer) reads *free* VRAM at startup and budgets 70% of it, using a per-pixel estimate of the IRWLS intermediates. On a shared GPU where another job's allocation can grow during the run, pin an explicit batch size to avoid mid-run OOM, and consider `PYTORCH_ALLOC_CONF=expandable_segments:True`.
 
@@ -319,7 +320,7 @@ saveRDS(spatial_obj, "spatial_rctd.rds")
 3. **Match reference to sample condition.** If your cohort mixes diagnoses (e.g. malignancy A vs B), do *not* run every sample against one combined reference containing disease-specific malignant prototypes -- RCTD will misassign healthy/reactive cells of the wrong-diagnosis samples to those prototypes. Branch on the sample's metadata column and pick the reference per sample.
 4. **Avoid `/` in cell-type names.** zarr/h5 may convert it to `_`. Pick consistent ASCII labels.
 5. **Downsample large references** to ~500 cells/type; more rarely improves the fit.
-6. **Prefer `dtype="float32"` on consumer GPUs.** Up to 2.3× faster in doublet mode (median 1.6× on the 15 benchmark datasets, L40S; no gain on the smallest), with ≥ 99.997% of spot classes unchanged. Stay on fp64 for validation runs against R `spacexr` (closest to R's arithmetic), with R's sigma passed via `--sigma-override`; results agree closely, not bit for bit.
+6. **Prefer `dtype="float32"` on consumer GPUs.** Up to 2.3× faster in doublet mode (median 1.6× on 15 of the benchmark datasets, L40S; no gain on the smallest), with ≥ 99.997% of spot classes unchanged. Stay on fp64 for validation runs against R `spacexr` (closest to R's arithmetic), with R's sigma passed via `--sigma-override`; results agree closely, not bit for bit.
 
 ## Gotchas
 

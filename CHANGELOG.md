@@ -20,7 +20,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Documentation
 - **Documentation site** at [rctd-py.readthedocs.io](https://rctd-py.readthedocs.io): installation, quick start, tutorial, CLI and API reference, and a page for R spacexr users (#33, #34).
-- **Benchmarks refreshed**: 15 datasets from eight platforms (3,798 to 714,535 cells) in all three modes, rctd-py on one NVIDIA L40S and on 8 CPU threads against R spacexr 2.2.1 on 8 cores, median of 3 runs. GPU vs R: 10-57x in doublet mode, 5-119x in full mode, 5-21x in multi mode.
+- **Benchmarks refreshed**: 19 datasets from eight platforms (2,518 to 714,535 cells) in all three modes, rctd-py on one NVIDIA L40S and on 8 CPU threads against R spacexr 2.2.1 on 8 cores, median of 3 runs. GPU vs R: 10-57x in doublet mode, 5-119x in full mode, 5-21x in multi mode.
 - **Agreement with R** on the docs site now covers 19 datasets with the 0.4.0 code: identical calls where both sides pick the same sigma (11 datasets), 98.99-99.88% of spot classes where sigma differs by 0.01-0.02.
 - **Corrections from a docs audit**: R spacexr does not normalise full-mode weights either; the CLI's `--batch-size` defaults to 10000 (`"auto"` is Python-only); mode recommendations now follow spacexr (doublet for segmented cells and high-resolution data); float32 speed-up re-measured (up to 2.3x, median 1.6x); `max_iter` removed from the tutorial, since it is not read yet; README links and images work on PyPI.
 
