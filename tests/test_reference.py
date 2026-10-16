@@ -228,3 +228,39 @@ def test_cell_type_order_follows_r():
         "Serpinf1",
         "adipocyte",
     ]
+
+
+def _labelled_reference(labels):
+    """Small reference whose types differ in one block of genes each, with the given labels."""
+    import anndata
+
+    rng = np.random.default_rng(0)
+    types = sorted(set(labels), key=str)
+    counts = rng.poisson(1, size=(len(labels), 10 * len(types))).astype(np.float32)
+    for i, lab in enumerate(labels):
+        j = types.index(lab)
+        counts[i, 10 * j : 10 * j + 10] += rng.poisson(20, size=10)
+    adata = anndata.AnnData(X=counts)
+    adata.obs["cell_type"] = labels
+    adata.obs_names = [f"c{i}" for i in range(len(labels))]
+    adata.var_names = [f"g{i}" for i in range(counts.shape[1])]
+    return adata
+
+
+def test_integer_cell_type_labels_sort_like_r_factor():
+    """Integer labels (e.g. cluster ids) are accepted, as in 0.3.9, and ordered numerically
+    like R's factor() levels: 2 before 10."""
+    labels = [10] * 30 + [2] * 30 + [1] * 30
+    ref = Reference(_labelled_reference(labels), cell_type_col="cell_type")
+    assert list(ref.cell_type_names) == [1, 2, 10]
+
+
+def test_categorical_labels_drop_unused_categories():
+    """A categorical keeps its category order but leaves out categories with no cells."""
+    import pandas as pd
+
+    labels = pd.Categorical(["b"] * 30 + ["a"] * 30, categories=["b", "unused", "a"])
+    adata = _labelled_reference(list(labels))
+    adata.obs["cell_type"] = labels
+    ref = Reference(adata, cell_type_col="cell_type")
+    assert list(ref.cell_type_names) == ["b", "a"]

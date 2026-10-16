@@ -24,9 +24,12 @@ def r_sort_key(name: str):
     spacexr falls back to "the first type" by index (doublet mode, one candidate), so the
     order changes results, not only the column order.
     """
+    if isinstance(name, (int, float, np.integer, np.floating)) and not isinstance(name, bool):
+        return (0, float(name), (), str(name))  # numeric labels: R's factor() sorts them by value
+    name = str(name)
     base = "".join(c for c in unicodedata.normalize("NFD", name) if not unicodedata.combining(c))
     primary = tuple(_R_RANK.get(c.lower(), len(_R_RANK) + ord(c.lower())) for c in base)
-    return primary, tuple(c.isupper() for c in base), name
+    return (1, primary, tuple(c.isupper() for c in base), name)
 
 
 class Reference:

@@ -332,3 +332,30 @@ def test_box_qp_is_exact_like_quadprog(monkeypatch):
     )  # positive control: 50 sweeps alone are not exact here
     x = _irwls._solve_box_qp_batch(Dt, dt, lt).numpy()
     np.testing.assert_allclose(x, exact, atol=1e-7)
+
+
+def test_box_qp_float32_finish_is_finite_and_no_worse(monkeypatch):
+    """In float32 the exact finish cannot reach float64's KKT tolerance; it must still return
+    finite, feasible solutions whose objective is no worse than Gauss-Seidel alone."""
+    from rctd import _irwls
+
+    monkeypatch.setattr(_irwls, "_USE_COMPILE", False)
+    torch.manual_seed(0)
+    for K in (5, 12, 40):
+        A = torch.randn(500, K, K)
+        D = A @ A.transpose(1, 2) + 1e-3 * torch.eye(K)
+        D = D / torch.linalg.matrix_norm(D, ord=2).view(-1, 1, 1)
+        d = torch.randn(500, K) * 0.1
+        lb = torch.zeros(500, K)
+        gs = _irwls._solve_box_qp_batch_fixed(D.clone(), d.clone(), lb.clone())
+        x = _irwls._solve_box_qp_batch(D, d, lb)
+        assert x.dtype == torch.float32 and torch.isfinite(x).all() and (x >= lb - 1e-6).all()
+
+        def obj(v):
+            return 0.5 * torch.bmm(v.unsqueeze(1), torch.bmm(D, v.unsqueeze(2))).view(-1) - (
+                d * v
+            ).sum(1)
+
+        assert (obj(x) <= obj(gs) + 1e-5).all(), K
+    # float32 cannot resolve float64's tolerance; float64 keeps R-exact 1e-10
+    assert _irwls._kkt_tol(torch.float64) == 1e-10 and 1e-6 < _irwls._kkt_tol(torch.float32) < 1e-4

@@ -452,6 +452,11 @@ except Exception:
 _QP_KKT_TOL = 1e-10
 
 
+def _kkt_tol(dtype: torch.dtype) -> float:
+    """1e-10 in float64; float32 cannot resolve that, so there it scales with machine epsilon."""
+    return max(_QP_KKT_TOL, 100 * torch.finfo(dtype).eps)
+
+
 def _finish_box_qp(
     D: torch.Tensor, d: torch.Tensor, lower_bound: torch.Tensor, x: torch.Tensor
 ) -> torch.Tensor:
@@ -463,7 +468,7 @@ def _finish_box_qp(
     """
     g = torch.bmm(D, x.unsqueeze(2)).squeeze(2) - d
     viol = torch.where(x > lower_bound, g.abs(), torch.clamp(-g, min=0.0)).amax(1)
-    idx = torch.nonzero(viol > _QP_KKT_TOL).squeeze(1)
+    idx = torch.nonzero(viol > _kkt_tol(D.dtype)).squeeze(1)
     if idx.numel() == 0:
         return x
     x = x.clone()
@@ -500,7 +505,7 @@ def _active_set_box_qp(
         y = torch.where(free, y, torch.zeros_like(y))
         # feasible solve: add the most violating bound variable, or stop
         w = c - torch.bmm(D, y.unsqueeze(2)).squeeze(2)
-        cand = ~free & (w > _QP_KKT_TOL)
+        cand = ~free & (w > _kkt_tol(D.dtype))
         optimal = fwd & ~cand.any(1)
         done = done | optimal
         add = fwd & ~optimal
