@@ -14,7 +14,7 @@
   </p>
 </p>
 
-> **Latest: v0.3.9**: `--table` picks one table from a SpatialData store with several (#28). v0.3.8 added SpatialData / AnnData Zarr input to the CLI (#28) and `RCTD_Q_MATRICES` for offline / HPC installs (#29). See the [changelog](https://github.com/p-gueguen/rctd-py/blob/main/CHANGELOG.md).
+> **Latest: v0.4.0**: rctd-py now makes the same calls as R spacexr wherever both pick the same sigma, after fixes to the bulk platform-effect fit, singlet labels, cell-type order, sigma sampling (`N_fit` 1000, as in R) and the QP solver. Calls can change from 0.3.9, most on sparse sequencing data (Visium, Visium HD, StrataMap); pin `rctd-py==0.3.9` to keep old results. See the [changelog](https://github.com/p-gueguen/rctd-py/blob/main/CHANGELOG.md).
 
 ---
 
