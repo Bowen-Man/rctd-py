@@ -278,6 +278,18 @@ def test_h5ad_style_categorical_gets_r_order():
     assert list(ref.cell_type_names) == ["adipocyte", "B cell", "T cell"]
 
 
+def test_h5ad_roundtrip_with_digit_labels_gets_r_order(tmp_path):
+    """anndata natsorts the categories it writes (Type_1 before Type_17); that order is not a
+    deliberate one either, so a reference read back from .h5ad still gets R's order."""
+    import anndata
+
+    labels = ["Type_17_x"] * 30 + ["gamma_x"] * 30 + ["Type_1_x"] * 30
+    adata = _labelled_reference(labels)
+    adata.write_h5ad(tmp_path / "ref.h5ad")
+    ref = Reference(anndata.read_h5ad(tmp_path / "ref.h5ad"), cell_type_col="cell_type")
+    assert list(ref.cell_type_names) == ["gamma_x", "Type_1_x", "Type_17_x"]
+
+
 def test_custom_categorical_order_is_kept():
     """A deliberate category order (e.g. an R factor's levels carried over) is kept."""
     import pandas as pd

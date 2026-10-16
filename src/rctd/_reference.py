@@ -10,6 +10,7 @@ from collections import Counter
 import anndata
 import numpy as np
 import pandas as pd
+from natsort import natsorted
 from scipy import sparse
 
 # R's default collation on Linux/macOS builds is ICU (CLDR root): spaces and punctuation, then
@@ -34,8 +35,10 @@ def r_sort_key(name: str):
 
 
 def _is_sorted(values) -> bool:
+    """True for an order that carries no meaning: sorted by code point (pandas) or natsorted
+    (anndata, when it writes string columns)."""
     try:
-        return all(a <= b for a, b in zip(values, values[1:]))
+        return list(values) in (sorted(values), natsorted(values))
     except TypeError:
         return False
 
@@ -74,8 +77,8 @@ class Reference:
             )
         cell_types = np.asarray(col.values)
         # Type order follows spacexr, which uses levels(cell_types). A categorical with a
-        # deliberate order (an R factor's levels) keeps it; one sorted by code point, as anndata
-        # stores every string column, carries no order and is sorted as R's factor() would.
+        # deliberate order (an R factor's levels) keeps it; one sorted by code point (pandas) or
+        # natsorted (anndata, for every string column) carries no order and is sorted as R would.
         cats = list(col.cat.categories) if isinstance(col.dtype, pd.CategoricalDtype) else None
         if cats is not None and not _is_sorted(cats):
             present = set(cell_types)
