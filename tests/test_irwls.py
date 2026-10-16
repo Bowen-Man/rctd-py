@@ -359,3 +359,22 @@ def test_box_qp_float32_finish_is_finite_and_no_worse(monkeypatch):
         assert (obj(x) <= obj(gs) + 1e-5).all(), K
     # float32 cannot resolve float64's tolerance; float64 keeps R-exact 1e-10
     assert _irwls._kkt_tol(torch.float64) == 1e-10 and 1e-6 < _irwls._kkt_tol(torch.float32) < 1e-4
+
+
+def test_box_qp_finish_survives_singular_and_nan(monkeypatch):
+    """A singular D (e.g. two near-identical cell types) or a non-finite one must not stop the
+    run, as Gauss-Seidel never did: those problems keep the Gauss-Seidel result (cf. issue #20).
+    """
+    from rctd import _irwls
+
+    monkeypatch.setattr(_irwls, "_USE_COMPILE", False)
+    torch.manual_seed(0)
+    for dtype in (torch.float64, torch.float32):
+        A = torch.randn(50, 12, 3, dtype=dtype)
+        D = A @ A.transpose(1, 2)  # rank 3 of 12: singular
+        D = D / torch.linalg.matrix_norm(D, ord=2).view(-1, 1, 1)
+        D[0, 0, 0] = float("nan")
+        d = torch.randn(50, 12, dtype=dtype)
+        lb = torch.zeros(50, 12, dtype=dtype)
+        x = _irwls._solve_box_qp_batch(D, d, lb)  # raised _LinAlgError before the fix
+        assert torch.isfinite(x[1:]).all() and (x[1:] >= -1e-6).all()

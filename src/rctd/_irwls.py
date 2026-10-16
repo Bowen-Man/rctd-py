@@ -479,18 +479,28 @@ def _finish_box_qp(
 def _active_set_box_qp(
     D: torch.Tensor, d: torch.Tensor, lb: torch.Tensor, x0: torch.Tensor
 ) -> torch.Tensor:
-    """min 0.5 x'Dx - d'x  s.t. x >= lb, batched; exact up to the linear solves."""
+    """min 0.5 x'Dx - d'x  s.t. x >= lb, batched; exact up to the linear solves.
+
+    A problem whose linear solve fails (singular or non-finite D) keeps x0, the Gauss-Seidel
+    result, instead of raising: Gauss-Seidel never stopped a run, and neither may this.
+    """
     n, K = d.shape
     c = d - torch.bmm(D, lb.unsqueeze(2)).squeeze(2)  # y = x - lb >= 0
     y = torch.clamp(x0 - lb, min=0.0)
     free = y > 0
     done = torch.zeros(n, dtype=torch.bool, device=D.device)
+    failed = torch.zeros(n, dtype=torch.bool, device=D.device)
     for _ in range(
         3 * K + 10
     ):  # ponytail: iteration cap; Lawson-Hanson ends far sooner in practice
         m = free.to(D.dtype)
         M = D * (m.unsqueeze(2) * m.unsqueeze(1)) + torch.diag_embed(1.0 - m)
-        s = torch.linalg.solve(M, (c * m).unsqueeze(2)).squeeze(2)
+        s, info = torch.linalg.solve_ex(M, (c * m).unsqueeze(2))
+        s = s.squeeze(2)
+        bad_solve = (info != 0) | ~torch.isfinite(s).all(1)
+        failed = failed | bad_solve
+        done = done | bad_solve
+        s = torch.where(bad_solve.unsqueeze(1), y, s)
         bad = free & (s <= 0)
         back = bad.any(1) & ~done
         # infeasible solve: step from y towards s until the first free variable hits zero
@@ -513,7 +523,7 @@ def _active_set_box_qp(
             break
         j = torch.where(cand, w, torch.full_like(w, -float("inf"))).argmax(1)
         free = free | (add.unsqueeze(1) & (torch.arange(K, device=D.device) == j.unsqueeze(1)))
-    return y + lb
+    return torch.where(failed.unsqueeze(1), x0, y + lb)
 
 
 @torch.jit.script
