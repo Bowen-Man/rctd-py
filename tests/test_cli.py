@@ -103,6 +103,19 @@ def test_validate_missing_column(h5ad_pair):
     assert "fail" in result.output.lower() or "FAIL" in result.output
 
 
+def test_validate_fails_on_missing_labels(h5ad_pair):
+    """validate must fail on a reference that `run` rejects (missing cell-type labels)."""
+    sp_path, ref_path = h5ad_pair
+    ref = anndata.read_h5ad(ref_path)
+    ref.obs["cell_type"] = ref.obs["cell_type"].astype(object)
+    ref.obs.iloc[:3, ref.obs.columns.get_loc("cell_type")] = np.nan
+    ref.write_h5ad(ref_path)
+    result = CliRunner().invoke(main, ["validate", str(sp_path), str(ref_path), "--json"])
+    data = json.loads(result.output)
+    assert data["status"] == "fail"
+    assert "3 cells" in data["checks"]["cell_type_col_exists"]["detail"]
+
+
 def test_validate_no_gene_overlap(tmp_path):
     """rctd validate fails when spatial and reference share no genes."""
     rng = np.random.default_rng(42)

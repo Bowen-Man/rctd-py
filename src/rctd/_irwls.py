@@ -642,11 +642,11 @@ def _solve_box_qp_batch_fixed(
     # First call: try compiled, fall back to eager on failure
     try:
         result = _solve_box_qp_batch_compiled(D, d, lower_bound, n_sweeps)
-    except RuntimeError:
+    except RuntimeError as e:
         _USE_COMPILE = False
         warnings.warn(
-            "torch.compile failed for box-QP solver (missing CUDA headers or Triton); "
-            "falling back to eager mode. Use RCTDConfig(compile=False) to suppress.",
+            f"torch.compile failed for box-QP solver ({type(e).__name__}); results are "
+            "unaffected, falling back to eager mode. Use RCTDConfig(compile=False) to suppress.",
             RuntimeWarning,
             stacklevel=2,
         )
