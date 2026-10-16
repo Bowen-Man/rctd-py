@@ -104,6 +104,12 @@ class RCTD:
         self.nUMI = nUMI_all[umi_mask]
         self._pixel_mask = umi_mask
         n_after = int(umi_mask.sum())
+        if n_after == 0:
+            raise ValueError(
+                f"No pixels pass the UMI filter (UMI_min={self.config.UMI_min}, "
+                f"UMI_max={self.config.UMI_max}; total UMI per pixel ranges "
+                f"{nUMI_all.min():.0f}-{nUMI_all.max():.0f}). Lower UMI_min."
+            )
         if n_after < n_before:
             print(
                 f"UMI filter: kept {n_after}/{n_before} pixels "

@@ -4,6 +4,7 @@ Ports get_cell_type_info, get_norm_ref, get_de_genes from R spacexr.
 """
 
 import unicodedata
+import warnings
 from collections import Counter
 
 import anndata
@@ -32,6 +33,13 @@ def r_sort_key(name: str):
     return (1, primary, tuple(c.isupper() for c in base), name)
 
 
+def _is_sorted(values) -> bool:
+    try:
+        return all(a <= b for a, b in zip(values, values[1:]))
+    except TypeError:
+        return False
+
+
 class Reference:
     """scRNA-seq reference for RCTD decomposition.
 
@@ -57,13 +65,21 @@ class Reference:
         if cell_type_col not in adata.obs.columns:
             raise ValueError(f"Column '{cell_type_col}' not found in adata.obs")
 
-        cell_types = np.asarray(adata.obs[cell_type_col].values)
-        # Type order follows spacexr, which uses levels(cell_types): a categorical keeps its
-        # category order (an R factor's levels), anything else is sorted as R's factor() would.
         col = adata.obs[cell_type_col]
-        if isinstance(col.dtype, pd.CategoricalDtype):
+        n_missing = int(pd.isna(col).sum())
+        if n_missing:
+            raise ValueError(
+                f"{n_missing} cells have a missing cell type in '{cell_type_col}'; "
+                "remove them or give them a label."
+            )
+        cell_types = np.asarray(col.values)
+        # Type order follows spacexr, which uses levels(cell_types). A categorical with a
+        # deliberate order (an R factor's levels) keeps it; one sorted by code point, as anndata
+        # stores every string column, carries no order and is sorted as R's factor() would.
+        cats = list(col.cat.categories) if isinstance(col.dtype, pd.CategoricalDtype) else None
+        if cats is not None and not _is_sorted(cats):
             present = set(cell_types)
-            unique_types = [c for c in col.cat.categories if c in present]
+            unique_types = [c for c in cats if c in present]
         else:
             unique_types = sorted(set(cell_types), key=r_sort_key)
 
@@ -72,12 +88,19 @@ class Reference:
         low_types = [ct for ct, count in type_counts.items() if count < cell_min]
         if low_types:
             remaining = [ct for ct in unique_types if ct not in low_types]
+            dropped = ", ".join(str(ct) for ct in low_types)
             if len(remaining) < 2:
                 raise ValueError(
                     f"After filtering cell types with fewer than {cell_min} cells "
-                    f"({', '.join(low_types)}), fewer than 2 cell types remain. "
+                    f"({dropped}), fewer than 2 cell types remain. "
                     f"Lower cell_min or add more cells."
                 )
+            warnings.warn(
+                f"Dropped {len(low_types)} cell type(s) with fewer than {cell_min} cells: "
+                f"{dropped}. R spacexr stops here instead; lower cell_min to keep them.",
+                UserWarning,
+                stacklevel=2,
+            )
             unique_types = remaining
             # Keep only cells from valid types
             keep_type_mask = np.isin(cell_types, unique_types)

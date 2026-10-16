@@ -349,6 +349,8 @@ def _write_results_to_adata(
     spatial_adata, result, mode, pixel_mask, config_dict, cell_type_names, version
 ):
     """Expand results to full AnnData shape and write slots."""
+    # .h5ad categoricals cannot mix numeric cell-type labels with "filtered"
+    cell_type_names = [str(c) for c in cell_type_names]
     import numpy as np
     import pandas as pd
 

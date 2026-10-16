@@ -264,3 +264,48 @@ def test_categorical_labels_drop_unused_categories():
     adata.obs["cell_type"] = labels
     ref = Reference(adata, cell_type_col="cell_type")
     assert list(ref.cell_type_names) == ["b", "a"]
+
+
+def test_h5ad_style_categorical_gets_r_order():
+    """anndata stores string labels as a categorical sorted by code point; that order carries no
+    meaning, so it is replaced by R's (the CLI and every .h5ad read must match R like the API)."""
+    import pandas as pd
+
+    labels = ["T cell"] * 30 + ["adipocyte"] * 30 + ["B cell"] * 30
+    adata = _labelled_reference(labels)
+    adata.obs["cell_type"] = pd.Categorical(labels)  # categories sorted: B cell, T cell, adipocyte
+    ref = Reference(adata, cell_type_col="cell_type")
+    assert list(ref.cell_type_names) == ["adipocyte", "B cell", "T cell"]
+
+
+def test_custom_categorical_order_is_kept():
+    """A deliberate category order (e.g. an R factor's levels carried over) is kept."""
+    import pandas as pd
+
+    labels = ["T cell"] * 30 + ["adipocyte"] * 30 + ["B cell"] * 30
+    adata = _labelled_reference(labels)
+    adata.obs["cell_type"] = pd.Categorical(labels, categories=["T cell", "adipocyte", "B cell"])
+    ref = Reference(adata, cell_type_col="cell_type")
+    assert list(ref.cell_type_names) == ["T cell", "adipocyte", "B cell"]
+
+
+def test_missing_labels_raise():
+    """NaN / None labels are an error, not a silent drop or a 'None' cell type."""
+    import pandas as pd
+
+    labels = ["a"] * 30 + ["b"] * 30
+    for missing in (None, float("nan")):
+        adata = _labelled_reference(labels)
+        lab = list(labels)
+        lab[:5] = [missing] * 5
+        adata.obs["cell_type"] = pd.Series(lab, index=adata.obs_names, dtype=object)
+        with pytest.raises(ValueError, match="missing"):
+            Reference(adata, cell_type_col="cell_type")
+
+
+def test_dropped_cell_types_warn():
+    """Types below cell_min are dropped (R would stop); the user is told which."""
+    labels = ["a"] * 30 + ["b"] * 30 + ["rare"] * 5
+    with pytest.warns(UserWarning, match="rare"):
+        ref = Reference(_labelled_reference(labels), cell_type_col="cell_type")
+    assert "rare" not in list(ref.cell_type_names)
