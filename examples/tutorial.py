@@ -36,7 +36,7 @@ def _(mo):
 
     rctd-py uses a GPU when PyTorch sees one. GPU builds of PyTorch, older NVIDIA drivers and
     offline installs are covered in the
-    [installation guide](https://rctd-py.readthedocs.io/en/stable/installation.html).
+    [installation guide](https://rctd-py.readthedocs.io/en/latest/installation.html).
     """)
     return
 
@@ -312,7 +312,7 @@ def _(mo):
     The first `run_rctd` call in a session also compiles the solver kernels with
     `torch.compile`. That one-off cost dominates the runtime on a dataset this small, so the
     timings printed above say little about speed; see the
-    [benchmarks](https://rctd-py.readthedocs.io/en/stable/benchmarks.html) for runtimes on real data.
+    [benchmarks](https://rctd-py.readthedocs.io/en/latest/benchmarks.html) for runtimes on real data.
     """)
     return
 
@@ -501,7 +501,7 @@ def _(mo):
     | `CONFIDENCE_THRESHOLD` | 5.0 | Confidence margin for selected types (doublet/multi) |
     | `compile` | `True` | Use `torch.compile`; set `False` (or pass `--no-compile`) to fall back to TorchScript JIT (no CUDA dev headers needed) |
 
-    See the [`RCTDConfig` reference](https://rctd-py.readthedocs.io/en/stable/generated/rctd.RCTDConfig.html)
+    See the [`RCTDConfig` reference](https://rctd-py.readthedocs.io/en/latest/generated/rctd.RCTDConfig.html)
     for the full list including bulk-fit cutoffs (`gene_cutoff`, `fc_cutoff`, …).
 
     The `batch_size` argument to `run_rctd` controls how many beads are processed
