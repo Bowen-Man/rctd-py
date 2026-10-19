@@ -32,9 +32,9 @@ def info(use_json):
         "cuda_devices": [],
     }
     try:
-        import anndata
+        from importlib.metadata import version  # anndata >= 0.13 deprecates anndata.__version__
 
-        data["anndata_version"] = anndata.__version__
+        data["anndata_version"] = version("anndata")
     except ImportError:
         data["anndata_version"] = "not installed"
     try:
