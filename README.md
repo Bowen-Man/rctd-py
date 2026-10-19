@@ -14,7 +14,7 @@
   </p>
 </p>
 
-> **New in v0.4.0:** rctd-py now gives the same results as R spacexr wherever both use the same sigma. Getting there aligned a few details of the fit with R (bulk platform-effect fit, sigma sampling, singlet labels, cell-type order, QP solver), so results can differ from 0.3.9, mostly on sequencing-based data such as Visium. On imaging data (Xenium, CosMx, Atera) spot classes are almost unchanged. Numbers are in the [changelog](https://github.com/p-gueguen/rctd-py/blob/main/CHANGELOG.md); `rctd-py==0.3.9` stays available to reproduce earlier results.
+> **New in v0.4.0:** rctd-py now gives the same results as R spacexr wherever both use the same sigma. Getting there aligned a few details of the fit with R (bulk platform-effect fit, sigma sampling, singlet labels, cell-type order, QP solver), so **results can differ from 0.3.9**, mostly on sequencing-based data such as Visium. On imaging data (Xenium, CosMx, Atera) spot classes are almost unchanged. Numbers are in the [changelog](https://github.com/p-gueguen/rctd-py/blob/main/CHANGELOG.md); `rctd-py==0.3.9` stays available to reproduce earlier results.
 
 ---
 
