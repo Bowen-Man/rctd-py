@@ -14,7 +14,7 @@
   </p>
 </p>
 
-> **Latest: v0.4.0**: rctd-py now makes the same calls as R spacexr wherever both pick the same sigma, after fixes to the bulk platform-effect fit, singlet labels, cell-type order, sigma sampling (`N_fit` 1000, as in R) and the QP solver. Calls can change from 0.3.9, most on sparse sequencing data (Visium, Visium HD, StrataMap); pin `rctd-py==0.3.9` to keep old results. See the [changelog](https://github.com/p-gueguen/rctd-py/blob/main/CHANGELOG.md).
+> ⚠️ **v0.4.0 changes analysis results.** rctd-py now makes the same calls as R spacexr wherever both pick the same sigma, after fixes to the bulk platform-effect fit, singlet labels, cell-type order, sigma sampling (`N_fit` 1000, as in R) and the QP solver. On Visium about 15% of spots get a different dominant cell type, and on Visium HD and StrataMap 7-19% of spot classes change; on Xenium, CosMx and Atera fewer than 1% of spot classes change (0.6-6% of first-type labels). Pin `rctd-py==0.3.9` to keep old results. See the [changelog](https://github.com/p-gueguen/rctd-py/blob/main/CHANGELOG.md).
 
 ---
 
