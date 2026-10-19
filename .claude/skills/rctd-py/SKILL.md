@@ -159,7 +159,7 @@ assert "cell_type" in adata.obs.columns
 | `--output / -o` | `<stem>_rctd.h5ad` | Output h5ad path |
 | `--device` | `auto` | `auto`, `cpu`, `cuda` |
 | `--batch-size` | `10000` | Pixels per IRWLS launch (integer). `"auto"` (sized from free VRAM) exists only in Python `run_rctd(batch_size="auto")` |
-| `--dtype` | `float64` | `float32` is up to 2.3× faster in doublet mode (median 1.6× on 15 of the benchmark datasets, L40S; no gain on the smallest), with ≥ 99.997% of spot classes unchanged (see GPU notes below) |
+| `--dtype` | `float64` | `float32` is 1.3× (Xenium, K=45) to 1.9× (Visium HD, K=78) faster in doublet mode on an L40S, with ≥ 99.99% of spot classes unchanged (see GPU notes below) |
 | `--cell-type-col` | `cell_type` | Reference `obs` column with labels |
 | `--umi-min` | `100` | **Use 20 for Xenium**; 100 is the R `spacexr` default |
 | `--umi-max` | `20000000` | Per-pixel UMI ceiling |
@@ -183,7 +183,7 @@ assert "cell_type" in adata.obs.columns
 
 ### `dtype="float32"` is usually the better default on GPU
 
-The default `dtype="float64"` matches R `spacexr` arithmetic and is the safest choice when validating against R. On a data-center GPU with strong fp64 (A100, H100) the cost is small. On consumer / workstation GPUs (RTX, L40S, Blackwell sm_120) fp64 throughput is 1/32-1/64 of fp32, and `dtype="float32"` is **up to 2.3× faster in doublet mode (median 1.6× on 15 of the benchmark datasets, L40S; no gain on the smallest), with ≥ 99.997% of spot classes unchanged**. In a synthetic example (L40S, sm_89, N=20000 spots, K=30 types): 76 s → 39 s; `spot_class` agreement with the fp64 run was 100%, weights diff `<1e-6`. See `tests/test_fp32_concordance.py` for the locked-in assertion.
+The default `dtype="float64"` matches R `spacexr` arithmetic and is the safest choice when validating against R. On a data-center GPU with strong fp64 (A100, H100) the cost is small. On consumer / workstation GPUs (RTX, L40S, Blackwell sm_120) fp64 throughput is 1/32-1/64 of fp32, and `dtype="float32"` is **1.3× (Xenium, K=45) to 1.9× (Visium HD, K=78) faster in doublet mode on an L40S (0.4.0, CUDA 13), with ≥ 99.99% of spot classes unchanged**. In a synthetic example (L40S, sm_89, N=20000 spots, K=30 types): 76 s → 39 s; `spot_class` agreement with the fp64 run was 100%, weights diff `<1e-6`. See `tests/test_fp32_concordance.py` for the locked-in assertion.
 
 For validation against R `spacexr`, stay on fp64 (closest to R's arithmetic) and pass R's sigma with `--sigma-override` / `sigma_override`; results agree closely, not bit for bit.
 
@@ -197,7 +197,9 @@ For validation against R `spacexr`, stay on fp64 (closest to R's arithmetic) and
 This was tuned empirically and is correct for the configurations we've tested. If you hit a perf cliff or a `CUSOLVER_STATUS_INVALID_VALUE` crash, override it:
 
 - `--eigh-threshold 0` (or `RCTDConfig(eigh_threshold=0)`): force CPU eigh on every architecture. Cheap and robust if a particular cuSOLVER batch shape is misbehaving.
-- `--eigh-threshold 64` etc.: force GPU eigh up to a higher K. Useful on V100/L20 if the CPU offload turns out to be slower than GPU eigh for your specific workload.
+- `--eigh-threshold 64` etc.: force GPU eigh up to a higher K. Whether it helps depends on the CUDA version, not the GPU: on an L40S, GPU eigh was 1.7-3.4× faster at K=45-78 with CUDA 13 (torch 2.14), but 3-7× slower with CUDA 11.8/12.1 (torch 2.4-2.7). Only raise it on CUDA 13+.
+
+**First-run compile cost.** `torch.compile` compiles kernels on the first run in a new environment: 10-20 min with torch 2.14, 40 min to several hours with torch 2.7 (longer at higher K and in fp32), and torch 2.4 recompiles in every new process. 0.3.9 has the same cost or worse. For one-off runs on older torch, `--no-compile` skips it at about 15% slower runs.
 
 ### CPU eigh thread oversubscription (fixed in v0.3.5)
 
@@ -320,7 +322,7 @@ saveRDS(spatial_obj, "spatial_rctd.rds")
 3. **Match reference to sample condition.** If your cohort mixes diagnoses (e.g. malignancy A vs B), do *not* run every sample against one combined reference containing disease-specific malignant prototypes -- RCTD will misassign healthy/reactive cells of the wrong-diagnosis samples to those prototypes. Branch on the sample's metadata column and pick the reference per sample.
 4. **Avoid `/` in cell-type names.** zarr/h5 may convert it to `_`. Pick consistent ASCII labels.
 5. **Downsample large references** to ~500 cells/type; more rarely improves the fit.
-6. **Prefer `dtype="float32"` on consumer GPUs.** Up to 2.3× faster in doublet mode (median 1.6× on 15 of the benchmark datasets, L40S; no gain on the smallest), with ≥ 99.997% of spot classes unchanged. Stay on fp64 for validation runs against R `spacexr` (closest to R's arithmetic), with R's sigma passed via `--sigma-override`; results agree closely, not bit for bit.
+6. **Prefer `dtype="float32"` on consumer GPUs.** 1.3-1.9× faster in doublet mode on an L40S, with ≥ 99.99% of spot classes unchanged. Stay on fp64 for validation runs against R `spacexr` (closest to R's arithmetic), with R's sigma passed via `--sigma-override`; results agree closely, not bit for bit.
 
 ## Gotchas
 

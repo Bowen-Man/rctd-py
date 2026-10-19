@@ -491,7 +491,10 @@ def _write_results_to_adata(
     "--no-compile",
     is_flag=True,
     default=False,
-    help="Disable torch.compile (for environments without CUDA headers).",
+    help=(
+        "Disable torch.compile: skips the first-run compile (up to hours on torch<2.14) "
+        "at about 15% slower runs; also for environments without CUDA headers."
+    ),
 )
 @click.option(
     "--eigh-threshold",
@@ -500,8 +503,8 @@ def _write_results_to_adata(
     help=(
         "Override the K cutoff for GPU eigh in _psd_batch. K<=threshold stays "
         "on GPU; K>threshold offloads to CPU LAPACK. Default is arch-based "
-        "(16 on sm_<9, 128 on sm_>=9). Bump (e.g. 64) on Volta/Turing/Ampere/"
-        "Ada when the CPU offload is the bottleneck (issue #22)."
+        "(16 on sm_<9, 128 on sm_>=9). Raising it helps only with CUDA 13+; "
+        "with CUDA 11.8/12.1 GPU eigh was 3-7x slower on an L40S."
     ),
 )
 # Performance

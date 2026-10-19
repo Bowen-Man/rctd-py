@@ -52,19 +52,22 @@ class RCTDConfig(NamedTuple):
     #: Largest count value in the likelihood tables.
     K_val: int = 1000
     #: ``"float64"`` (R arithmetic) or ``"float32"`` (on GPUs with limited fp64 throughput:
-    #: up to 2.3x faster in doublet mode, median 1.6x, and about half the VRAM on
-    #: whole-transcriptome data; measured on an L40S).
+    #: 1.3-1.9x faster in doublet mode and about half the VRAM on whole-transcriptome data;
+    #: measured on an L40S).
     dtype: str = "float64"
     #: ``"auto"`` (GPU if available), ``"cpu"`` or ``"cuda"``.
     device: str = "auto"
-    #: Use ``torch.compile``. ``False`` skips it (the box-QP solver then uses TorchScript, the
-    #: rest runs eagerly), for environments without CUDA development headers.
+    #: Use ``torch.compile``. The first run in a new environment compiles kernels: 10-20 min with
+    #: torch 2.14, up to hours with torch 2.4-2.7 (torch 2.4 recompiles in every new process).
+    #: ``False`` skips it at about 15% slower runs (the box-QP solver then uses TorchScript, the
+    #: rest runs eagerly); also for environments without CUDA development headers.
     compile: bool = True
     #: ``{cell_type -> class}`` mapping for hierarchical fallback in doublet mode;
     #: ``None`` makes each type its own class.
     class_df: dict[str, str] | None = None
     #: Override the per-architecture K cutoff for GPU ``eigh`` (default ``None``, meaning K <= 16 on
-    #: sm < 9 and K <= 128 on sm >= 9). Raise it when the CPU offload is the bottleneck (issue #22).
+    #: sm < 9 and K <= 128 on sm >= 9). Raising it helps only with recent CUDA: on an
+    #: L40S, GPU eigh was 1.7-3.4x faster at K=45-78 with CUDA 13, 3-7x slower with CUDA 11.8/12.1.
     #: CPU runs ignore it.
     eigh_threshold: int | None = None
 

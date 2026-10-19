@@ -302,7 +302,8 @@ def _cuda_eigh_threshold(device: torch.device) -> int:
     """Per-arch K threshold for staying on GPU eigh vs offloading to CPU OpenBLAS.
 
     Benchmarks at K=45 on Ampere/L40S showed CPU OpenBLAS beats cuSOLVER's
-    batched syevj — hence the historical K<=16 cutoff. On Hopper (sm_90+)
+    batched syevj — hence the historical K<=16 cutoff. That holds with CUDA 11.8/12.1; with
+    CUDA 13 GPU eigh is 1.7-3.4x faster at K=45-78 on an L40S (0.4.0 GPU matrix). On Hopper (sm_90+)
     and Blackwell (sm_100+), cuSOLVER's batched eigh is much faster, and
     CPU offload causes a major perf cliff (8h+ stalls observed at K=78).
     Bump the threshold on newer arches.

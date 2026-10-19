@@ -50,8 +50,8 @@ result = run_rctd(spatial, reference, mode="doublet", config=config, batch_size=
 
 On GPUs with limited fp64 throughput (L40S, RTX and Blackwell workstation cards),
 `dtype="float32"` is usually faster and needs about half the VRAM on whole-transcriptome data. On
-an L40S in doublet mode it was up to 2.3x faster (median 1.6x; no gain on the smallest dataset) on
-15 of the {doc}`benchmark <benchmarks>` datasets, with 99.997% or more of the spot classes unchanged. The default `float64` matches R's
+an L40S in doublet mode (0.4.0, CUDA 13) it was 1.3x faster on Xenium (K=45) and 1.9x on Visium HD (K=78), with 99.99% or more of the spot classes
+unchanged. The default `float64` matches R's
 arithmetic.
 
 ## Hierarchical cell types (`class_df`)
