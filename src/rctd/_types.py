@@ -78,15 +78,12 @@ def resolve_device(device: str = "auto") -> torch.device:
         return torch.device("cuda" if torch.cuda.is_available() else "cpu")
     return torch.device(device)
 
-
 def auto_batch_size(
     G: int,
     K: int,
     dtype_bytes: int = 4,
     budget_fraction: float = 0.7,
     default: int = 10000,
-    mode: Literal["full", "doublet", "multi"] = "doublet",
-    stream_gpu: bool = False,
 ) -> int:
     """Calculate optimal batch size based on available GPU VRAM.
 
@@ -106,34 +103,13 @@ def auto_batch_size(
     # Per-pixel intermediates in solve_irwls_batch_shared:
     #   Y_batch(G) + prediction(G) + d1/d2(G) + solution(K) + grad(K)
     #   + hess(K*K) + D(K*K) + d_vec(K) + delta_w(K) + w_new(K)
-    # bytes_per_pixel = (3 * G + 5 * K + 2 * K * K) * dtype_bytes
-    # if bytes_per_pixel <= 0:
-    #     return default
+    bytes_per_pixel = (3 * G + 5 * K + 2 * K * K) * dtype_bytes
 
-    # computed = budget // bytes_per_pixel
-    # return max(1024, min(computed, 200000))
+    if bytes_per_pixel <= 0:
+        return default
 
-    if stream_gpu and mode == "full":
-        # conservative streaming estimate
-        bytes_per_pixel = (
-            4 * G # Fix 5 ~?
-            + 5 * K
-            + 2 * K * K
-        ) * dtype_bytes
-
-        computed = budget // bytes_per_pixel
-        return max(1, min(computed, 200000))
-
-    else:
-        # exact legacy 0.4.0 behavior
-        bytes_per_pixel = (
-            3 * G
-            + 5 * K
-            + 2 * K * K
-        ) * dtype_bytes
-
-        computed = budget // bytes_per_pixel
-        return max(1024, min(computed, 200000))
+    computed = budget // bytes_per_pixel
+    return max(1024, min(computed, 200000))
 
 
 class FullResult(NamedTuple):

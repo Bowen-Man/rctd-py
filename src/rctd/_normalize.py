@@ -102,9 +102,9 @@ def _longdouble_sum(t: torch.Tensor, dim: int) -> torch.Tensor:
 #     return bulk_weights, norm_profiles
 
 def fit_bulk(
-    cell_type_profiles: torch.Tensor,
-    spatial_counts: torch.Tensor,
-    spatial_nUMI: torch.Tensor,
+    cell_type_profiles: torch.Tensor, # On chip persistently
+    spatial_counts: torch.Tensor, # batch
+    spatial_nUMI: torch.Tensor, # batch
     min_change: float = 0.001,
     max_iter: int = 100,
     min_obs: int = 10,
