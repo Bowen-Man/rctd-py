@@ -1,6 +1,6 @@
 """Result types for RCTD."""
 
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 
 import numpy as np
 import torch
@@ -85,6 +85,8 @@ def auto_batch_size(
     dtype_bytes: int = 4,
     budget_fraction: float = 0.7,
     default: int = 10000,
+    mode: Literal["full", "doublet", "multi"] = "doublet",
+    stream_gpu: bool = False,
 ) -> int:
     """Calculate optimal batch size based on available GPU VRAM.
 
@@ -104,13 +106,34 @@ def auto_batch_size(
     # Per-pixel intermediates in solve_irwls_batch_shared:
     #   Y_batch(G) + prediction(G) + d1/d2(G) + solution(K) + grad(K)
     #   + hess(K*K) + D(K*K) + d_vec(K) + delta_w(K) + w_new(K)
-    bytes_per_pixel = (3 * G + 5 * K + 2 * K * K) * dtype_bytes
+    # bytes_per_pixel = (3 * G + 5 * K + 2 * K * K) * dtype_bytes
+    # if bytes_per_pixel <= 0:
+    #     return default
 
-    if bytes_per_pixel <= 0:
-        return default
+    # computed = budget // bytes_per_pixel
+    # return max(1024, min(computed, 200000))
 
-    computed = budget // bytes_per_pixel
-    return max(1024, min(computed, 200000))
+    if stream_gpu and mode == "full":
+        # conservative streaming estimate
+        bytes_per_pixel = (
+            4 * G # Fix 5 ~?
+            + 5 * K
+            + 2 * K * K
+        ) * dtype_bytes
+
+        computed = budget // bytes_per_pixel
+        return max(1, min(computed, 200000))
+
+    else:
+        # exact legacy 0.4.0 behavior
+        bytes_per_pixel = (
+            3 * G
+            + 5 * K
+            + 2 * K * K
+        ) * dtype_bytes
+
+        computed = budget // bytes_per_pixel
+        return max(1024, min(computed, 200000))
 
 
 class FullResult(NamedTuple):

@@ -70,18 +70,30 @@ def choose_sigma(
             sq_matrices[key] = compute_spline_coefficients(q_mat, np.array(x_vals))
 
     # ── Pre-convert arrays to torch tensors ──
-    x_j = torch.as_tensor(x_vals, device=device)
-    P_gpu = torch.as_tensor(norm_profiles, device=device)
-    fit_counts = torch.as_tensor(spatial_counts[fit_idx], device=device)
+    # x_j = torch.as_tensor(x_vals, device=device) CPU fallback safety-net
+    # P_gpu = torch.as_tensor(norm_profiles, device=device)
+    x_j = torch.tensor(x_vals, device=device)
+    P_gpu = torch.tensor(norm_profiles, device=device)
+    fit_counts = torch.as_tensor(spatial_counts[fit_idx], device=device) # it's safe because advanced indexing will construct a new copy
     fit_numi = torch.as_tensor(spatial_numi[fit_idx], device=device)
 
     sigma = sigma_init
 
     def stage_sigma_tables(sigma):
         key = str(sigma)
-        Q = torch.as_tensor(q_matrices[key], device=device)
-        SQ = torch.as_tensor(sq_matrices[key], device=device)
+
+        Q = torch.as_tensor(
+            q_matrices[key],
+            device=device,
+        )
+
+        SQ = torch.as_tensor(
+            sq_matrices[key],
+            device=device,
+        )
+
         return Q, SQ
+
 
     for epoch in range(n_epoch):
         # ── Step 1: Fit weights at current sigma ──
@@ -137,7 +149,7 @@ def choose_sigma(
         mult_fac_vec = torch.arange(8, 13, dtype=X.dtype, device=device) / 10.0
 
         # Filter to available sigma candidates
-        valid_cands = [s for s in sigma_cands if str(s) in q_matrices and str(s) in sq_matrices]
+        valid_cands = [s for s in sigma_cands if (str(s) in q_matrices and str(s) in sq_matrices)]
         if not valid_cands:
             break
 

@@ -31,8 +31,7 @@ def run_full_mode(
         sq_mat: Likelihood spline table for selected sigma
         x_vals: Lambda grid points
         batch_size: Number of pixels to process simultaneously on GPU
-        stream_gpu: Transfer only the current pixel batch to the GPU. This is
-            supported by full mode; the default keeps the existing resident path.
+        stream_gpu: If true, transfer only the current pixel batch to GPU
 
     Returns:
         FullResult object containing weights per pixel.
@@ -40,17 +39,17 @@ def run_full_mode(
     N, G = spatial_counts.shape
     device = resolve_device(device)
 
-    P_gpu = torch.as_tensor(norm_profiles, device=device)
+    P_gpu = torch.tensor(norm_profiles, device=device)
     Q_gpu = torch.as_tensor(q_mat, device=device)
     SQ_gpu = torch.as_tensor(sq_mat, device=device)
-    X_gpu = torch.as_tensor(x_vals, device=device)
+    X_gpu = torch.tensor(x_vals, device=device)
 
+    # Pre-transfer all spatial data to GPU at once (avoids per-batch numpy→CUDA copy)
     if stream_gpu:
         Y_gpu = nUMI_gpu = None
     else:
-        # Keep the original path as a parity oracle and for workloads that fit in VRAM.
-        Y_gpu = torch.as_tensor(spatial_counts, device=device)
-        nUMI_gpu = torch.as_tensor(spatial_numi, device=device)
+        Y_gpu = torch.tensor(spatial_counts, device=device)
+        nUMI_gpu = torch.tensor(spatial_numi, device=device)
 
     all_weights = []
     all_converged = []
@@ -59,6 +58,7 @@ def run_full_mode(
         end = min(start + batch_size, N)
 
         if stream_gpu:
+            # Only current batch occupies GPU; no full spatial matrix allocation.
             Y_batch = torch.as_tensor(spatial_counts[start:end], device=device)
             nUMI_batch = torch.as_tensor(spatial_numi[start:end], device=device)
         else:
