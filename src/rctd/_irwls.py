@@ -757,11 +757,11 @@ def solve_irwls_batch(
 
 @torch.no_grad()
 def solve_irwls_batch_shared(
-    P: torch.Tensor,
-    Y_batch: torch.Tensor,
-    nUMI_batch: torch.Tensor,
-    Q_mat: torch.Tensor,
-    SQ_mat: torch.Tensor,
+    P: torch.Tensor,# Keep the profile on the chip(and it is small enough)
+    Y_batch: torch.Tensor, # chunked spatial counts matrix
+    nUMI_batch: torch.Tensor, # chunked spatial numi matrix
+    Q_mat: torch.Tensor, # H2D Q_mat_child
+    SQ_mat: torch.Tensor, # H2D SQ_mat_child
     x_vals: torch.Tensor,
     max_iter: int = 50,
     min_change: float = 0.001,
@@ -841,22 +841,35 @@ def solve_irwls_batch_shared(
         if bulk_mode:
             d1_vec = -2.0 * (torch.log(prediction) - torch.log(Y_act + 1e-10)) / prediction
             d2_vec = -2.0 * (1.0 - torch.log(prediction) + torch.log(Y_act + 1e-10)) / prediction**2
+            del prediction
         else:
             _, d1_flat, d2_flat = _q_fn(
                 Y_act.reshape(-1), prediction.reshape(-1), Q_mat, SQ_mat, x_vals
             )
+            del _, prediction # Actually it's d0_flat, and we do not need it.
             d1_vec = d1_flat.reshape(n_act, G)
+            del d1_flat
             d2_vec = d2_flat.reshape(n_act, G)
+            del d2_flat
 
         # Gradient: matmul replaces bmm
         # grad = -(d1 @ S) = -(d1 * nUMI) @ P
-        grad = -((d1_vec * nUMI_act.unsqueeze(1)) @ P)
+        d1_vec.mul_(nUMI_act.unsqueeze(1))
+
+        grad = d1_vec @ P
+        del d1_vec
+        grad.neg_()
+
 
         # Hessian via P outer product: matmul replaces bmm
         # H[n,i,j] = nUMI[n]^2 * sum_g (-d2[n,g]) * P[g,i] * P[g,j]
-        d2_w = (-d2_vec) * (nUMI_act**2).unsqueeze(1)  # (n_act, G)
-        hess = (d2_w @ P_outer).reshape(n_act, K, K)
-        del d2_w, d1_vec, d2_vec, prediction  # free large intermediates
+        d2_vec.neg_()
+        d2_vec.mul_(nUMI_act.square().unsqueeze(1)) # In-place changes
+        hess = (d2_vec @ P_outer).reshape(n_act, K, K) # Establishing Hessian matrix
+        # establish the Hessian matrix spot-by-spot
+        # Avoiding establish the whole matrix at ones
+
+        del d2_vec # free intermediates
 
         hess, norm_factor = _psd_batch(hess)
         norm_factor = torch.clamp(norm_factor, min=1e-10)
