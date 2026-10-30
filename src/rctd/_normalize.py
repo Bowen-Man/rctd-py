@@ -5,17 +5,6 @@ import torch
 
 from rctd._irwls import solve_irwls
 
-# Composing:
-# _longdouble_sum(t: torch.Tensor, dim: int)
-# fit_bulk()
-
-# Depending on:
-# solve_irwls()
-
-# N：the numbers of spots
-# G：gene numbers (participating in the compute)
-# K：cell type numbers of reference
-# B:batch size
 
 def _longdouble_sum(t: torch.Tensor, dim: int) -> torch.Tensor:
     """Sum a tensor along a dimension using longdouble accumulation.
@@ -28,83 +17,15 @@ def _longdouble_sum(t: torch.Tensor, dim: int) -> torch.Tensor:
     arr = t.detach().cpu().numpy()
     # Accumulate in longdouble without first materializing an entire
     # longdouble copy of the input array.
-    result = np.sum(arr,axis=dim,dtype=np.longdouble,).astype(np.float64)
+    result = np.sum(arr, axis=dim, dtype=np.longdouble).astype(np.float64)
 
-    return torch.as_tensor(result, dtype=t.dtype,)
+    return torch.as_tensor(result, dtype=t.dtype)
 
-
-# def fit_bulk(
-#     cell_type_profiles: torch.Tensor,
-#     spatial_counts: torch.Tensor,
-#     spatial_nUMI: torch.Tensor,
-#     min_change: float = 0.001,
-#     max_iter: int = 100,
-#     min_obs: int = 10,
-# ) -> Tuple[torch.Tensor, torch.Tensor]:
-
-#     device = cell_type_profiles.device
-#     dtype = cell_type_profiles.dtype
-
-#     # Sum counts across all pixels (N, G) -> (G,)
-#     # Use longdouble accumulation to match R's long double precision,
-#     # eliminating BLAS-order-dependent divergence in platform effects.
-#     bulk_Y = _longdouble_sum(spatial_counts, dim=0)
-
-#     # Total UMI across all pixels
-#     bulk_nUMI = _longdouble_sum(spatial_nUMI, dim=0)
-
-#     # Scale reference profiles to bulk nUMI
-#     bulk_S = cell_type_profiles * bulk_nUMI
-
-#     # Note: in R's fitBulk, bulkData is fit using the gaussian approximation method (bulk_mode=True)
-#     # and constrain=False. For bulk_mode=True, we don't need Q_mat etc.
-#     # We pass zeros/dummy values for the likelihood tables since they are ignored in bulk_mode
-#     dummy_Q = torch.zeros((1, 1), dtype=dtype, device=device)
-#     dummy_SQ = torch.zeros((1, 1), dtype=dtype, device=device)
-#     dummy_x = torch.zeros((1,), dtype=dtype, device=device)
-
-#     # R's prepareBulkData decomposes only genes with >= MIN_OBS (10) total counts;
-#     # get_norm_ref below still renormalises every bulk gene.
-#     obs = bulk_Y >= min_obs
-#     bulk_weights, converged = solve_irwls(
-#         S=bulk_S[obs],
-#         Y=bulk_Y[obs],
-#         nUMI=bulk_nUMI,
-#         Q_mat=dummy_Q,
-#         SQ_mat=dummy_SQ,
-#         x_vals=dummy_x,
-#         max_iter=max_iter,
-#         min_change=min_change,
-#         constrain=False,
-#         bulk_mode=True,
-#     )
-
-#     # R's fitBulk uses constrain=False: only clip negatives, do NOT
-#     # normalize to sum=1.  The raw magnitude matters for get_norm_ref.
-#     bulk_weights = torch.clamp(bulk_weights, min=0.0)
-
-
-#     prop_sum = torch.clamp(torch.sum(bulk_weights), min=1e-10)
-#     prop_normalized = bulk_weights / prop_sum
-
-#     # weight_avg: expected gene expression using normalized proportions (G,)
-#     weight_avg = cell_type_profiles @ prop_normalized
-
-#     # target_means: observed gene frequency = bulk_Y / total_nUMI (G,)
-#     target_means = bulk_Y / torch.clamp(bulk_nUMI, min=1e-10)
-
-#     # gene_factor = weight_avg / target_means (G,)
-#     gene_factor = weight_avg / torch.clamp(target_means, min=1e-10)
-
-#     # norm_profiles = profiles / gene_factor
-#     norm_profiles = cell_type_profiles / torch.clamp(gene_factor[:, None], min=1e-10)
-
-#     return bulk_weights, norm_profiles
 
 def fit_bulk(
-    cell_type_profiles: torch.Tensor, # On chip persistently
-    spatial_counts: torch.Tensor, # batch
-    spatial_nUMI: torch.Tensor, # batch
+    cell_type_profiles: torch.Tensor,
+    spatial_counts: torch.Tensor,
+    spatial_nUMI: torch.Tensor,
     min_change: float = 0.001,
     max_iter: int = 100,
     min_obs: int = 10,
@@ -127,31 +48,17 @@ def fit_bulk(
         (G, K) platform-effect normalized reference profiles.
     """
     device = cell_type_profiles.device
-    dtype = cell_type_profiles.dtype # Only the dtype of ref
+    dtype = cell_type_profiles.dtype
 
-    # ------------------------------------------------------------
-    # CPU-side global reduction
-    # ------------------------------------------------------------
+    # Reduce the complete spatial inputs on CPU, keeping their original dtype.
+    bulk_Y_cpu = _longdouble_sum(spatial_counts, dim=0)
+    bulk_nUMI_cpu = _longdouble_sum(spatial_nUMI, dim=0)
 
-    bulk_Y_cpu = _longdouble_sum(
-        spatial_counts, # On RAM
-        dim=0,
-    )
-    bulk_nUMI_cpu = _longdouble_sum(
-        spatial_nUMI, # On RAM
-        dim=0,
-    )
-    # ------------------------------------------------------------
-    # Transfer only reduced data to compute device
-    # ------------------------------------------------------------
+    # Transfer only the reduced gene vector and scalar to the compute device.
+    bulk_Y = bulk_Y_cpu.to(device=device)
+    bulk_nUMI = bulk_nUMI_cpu.to(device=device)
 
-    bulk_Y = bulk_Y_cpu.to(
-        device=device,
-    )
-    bulk_nUMI = bulk_nUMI_cpu.to(
-        device=device,
-    )
-    # (G, K)
+    # Scale reference profiles to bulk nUMI.
     bulk_S = cell_type_profiles * bulk_nUMI
     # Note: in R's fitBulk, bulkData is fit using the gaussian approximation method (bulk_mode=True)
     # and constrain=False. For bulk_mode=True, we don't need Q_mat etc.
@@ -181,6 +88,11 @@ def fit_bulk(
     bulk_weights = torch.clamp(bulk_weights, min=0.0)
 
     # Compute normalized reference profiles (get_norm_ref equivalent)
+    # R source (processRef.R:52-57):
+    #   weight_avg = rowSums(sweep(profiles[gene_list,], 2, proportions/sum(proportions), '*'))
+    #   target_means = bulk_vec[gene_list] / sum(puck@nUMI)
+    #   normed = sweep(profiles[gene_list,], 1, weight_avg / target_means, '/')
+    #
     # Key: R normalizes proportions to sum=1 BEFORE computing weighted average.
 
     # Normalize proportions to sum to 1 (matching R's proportions/sum(proportions))

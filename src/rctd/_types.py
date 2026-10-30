@@ -1,6 +1,6 @@
 """Result types for RCTD."""
 
-from typing import Literal, NamedTuple
+from typing import NamedTuple
 
 import numpy as np
 import torch
@@ -77,6 +77,7 @@ def resolve_device(device: str = "auto") -> torch.device:
     if device == "auto":
         return torch.device("cuda" if torch.cuda.is_available() else "cpu")
     return torch.device(device)
+
 
 def auto_batch_size(
     G: int,

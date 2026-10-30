@@ -757,11 +757,11 @@ def solve_irwls_batch(
 
 @torch.no_grad()
 def solve_irwls_batch_shared(
-    P: torch.Tensor,# Keep the profile on the chip(and it is small enough)
-    Y_batch: torch.Tensor, # chunked spatial counts matrix
-    nUMI_batch: torch.Tensor, # chunked spatial numi matrix
-    Q_mat: torch.Tensor, # H2D Q_mat_child
-    SQ_mat: torch.Tensor, # H2D SQ_mat_child
+    P: torch.Tensor,
+    Y_batch: torch.Tensor,
+    nUMI_batch: torch.Tensor,
+    Q_mat: torch.Tensor,
+    SQ_mat: torch.Tensor,
     x_vals: torch.Tensor,
     max_iter: int = 50,
     min_change: float = 0.001,
@@ -846,7 +846,7 @@ def solve_irwls_batch_shared(
             _, d1_flat, d2_flat = _q_fn(
                 Y_act.reshape(-1), prediction.reshape(-1), Q_mat, SQ_mat, x_vals
             )
-            del _, prediction # Actually it's d0_flat, and we do not need it.
+            del _, prediction
             d1_vec = d1_flat.reshape(n_act, G)
             del d1_flat
             d2_vec = d2_flat.reshape(n_act, G)
@@ -860,16 +860,13 @@ def solve_irwls_batch_shared(
         del d1_vec
         grad.neg_()
 
-
         # Hessian via P outer product: matmul replaces bmm
         # H[n,i,j] = nUMI[n]^2 * sum_g (-d2[n,g]) * P[g,i] * P[g,j]
         d2_vec.neg_()
-        d2_vec.mul_(nUMI_act.square().unsqueeze(1)) # In-place changes
-        hess = (d2_vec @ P_outer).reshape(n_act, K, K) # Establishing Hessian matrix
-        # establish the Hessian matrix spot-by-spot
-        # Avoiding establish the whole matrix at ones
+        d2_vec.mul_(nUMI_act.square().unsqueeze(1))
+        hess = (d2_vec @ P_outer).reshape(n_act, K, K)
 
-        del d2_vec # free intermediates
+        del d2_vec
 
         hess, norm_factor = _psd_batch(hess)
         norm_factor = torch.clamp(norm_factor, min=1e-10)

@@ -224,21 +224,13 @@ class RCTD:
         #    puck@nUMI (total across ALL original genes, never recomputed)
         print("Fitting bulk platform effects...")
 
-        bulk_profiles = self.reference.get_profiles_for_genes(gene_list_bulk) # 需要分析方法引用
-
-        # Modified:
-        # bulk_weights, norm_prof_bulk = fit_bulk(
-        #     cell_type_profiles=torch.tensor(bulk_profiles, device=device),
-        #     spatial_counts=torch.tensor(bulk_counts, device=device),
-        #     spatial_nUMI=torch.tensor(self.nUMI, device=device),
-        #     min_change=self.config.MIN_CHANGE_BULK,
-        # )
+        bulk_profiles = self.reference.get_profiles_for_genes(gene_list_bulk)
 
         bulk_weights, norm_prof_bulk = fit_bulk(
-            cell_type_profiles=torch.as_tensor(bulk_profiles,device=device,),
+            cell_type_profiles=torch.as_tensor(bulk_profiles, device=device),
             # Keep full spatial data in CPU RAM.
-            spatial_counts=torch.as_tensor(bulk_counts,), # no flooding into VRAM ; Here we can keep the in- place modification
-            spatial_nUMI=torch.as_tensor(self.nUMI,), # Here we can keep the in- place modification
+            spatial_counts=torch.as_tensor(bulk_counts),
+            spatial_nUMI=torch.as_tensor(self.nUMI),
             min_change=self.config.MIN_CHANGE_BULK,
         )
 
@@ -321,7 +313,7 @@ def run_rctd(
     reference: Reference,
     mode: Literal["full", "doublet", "multi"] = "doublet",
     config: RCTDConfig | None = None,
-    batch_size: int | str = "auto", # B
+    batch_size: int | str = "auto",
     sigma_override: int | None = None,
     stream_gpu: bool = False,
 ) -> Union[FullResult, DoubletResult, MultiResult]:  # noqa: UP007
@@ -358,8 +350,7 @@ def run_rctd(
     dtype_bytes = 8 if rctd.config.dtype == "float64" else 4
 
     if batch_size == "auto":
-        # batch_size = auto_batch_size(G,K,dtype_bytes=dtype_bytes,mode=mode,stream_gpu=stream_gpu,)
-        batch_size = auto_batch_size(G,K,dtype_bytes=dtype_bytes)
+        batch_size = auto_batch_size(G, K, dtype_bytes=dtype_bytes)
         print(f"Auto batch size: {batch_size}")
 
     print(f"Running in {mode} mode...")

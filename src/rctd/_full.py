@@ -44,7 +44,7 @@ def run_full_mode(
     SQ_gpu = torch.as_tensor(sq_mat, device=device)
     X_gpu = torch.tensor(x_vals, device=device)
 
-    # Pre-transfer all spatial data to GPU at once (avoids per-batch numpy→CUDA copy)
+    # The default resident path avoids per-batch NumPy-to-device copies.
     if stream_gpu:
         Y_gpu = nUMI_gpu = None
     else:
